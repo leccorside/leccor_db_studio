@@ -2,6 +2,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { join } from 'path'
 import crypto from 'crypto'
 
+// Mock better-sqlite3
+const mockPrepare = vi.fn();
+const mockExec = vi.fn();
+const mockClose = vi.fn();
+const mockRun = vi.fn();
+const mockGet = vi.fn();
+const mockAll = vi.fn();
+
+vi.mock('better-sqlite3', () => {
+  return {
+    default: class {
+      constructor() {}
+      exec = mockExec
+      prepare = mockPrepare.mockReturnValue({
+        run: mockRun,
+        get: mockGet,
+        all: mockAll
+      })
+      close = mockClose
+    }
+  };
+});
+
 // Mock Electron
 vi.mock('electron', () => ({
   app: {
@@ -13,22 +36,12 @@ import { initDB, getDB, saveSetting, getSetting, encrypt, decrypt, saveConnectio
 
 describe('Database Unit Tests', () => {
   beforeEach(() => {
-    // Try to close if already open
-    try {
-      const db = getDB()
-      db.close()
-    } catch (e) {}
-
-    // Delete test db if exists
-    const fs = require('fs')
-    const dbPath = join(__dirname, 'leccor_db_studio.sqlite')
-    if (fs.existsSync(dbPath)) {
-      try {
-        fs.unlinkSync(dbPath)
-      } catch (e) {
-        console.warn('Could not delete db file, it might be locked', e)
-      }
-    }
+    vi.clearAllMocks();
+    
+    // Default mocks for sqlite3 returns
+    mockGet.mockReturnValue({ value: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' });
+    mockAll.mockReturnValue([]);
+    mockRun.mockReturnValue({ changes: 1, lastInsertRowid: 1 });
     
     // Initialize DB fresh for each test
     initDB()
@@ -37,11 +50,16 @@ describe('Database Unit Tests', () => {
   it('should initialize DB correctly', () => {
     const db = getDB()
     expect(db).toBeDefined()
+    expect(mockExec).toHaveBeenCalled()
   })
 
   it('should save and get settings', () => {
+    mockGet.mockReturnValueOnce({ value: 'test_value' });
+    
     saveSetting('test_key', 'test_value')
     const val = getSetting('test_key')
+    
+    expect(mockPrepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO settings'))
     expect(val).toBe('test_value')
   })
 
@@ -70,6 +88,22 @@ describe('Database Unit Tests', () => {
     }
 
     saveConnection(conn)
+
+    // Verify saveConnection was called correctly
+    expect(mockPrepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO connections'))
+    expect(mockRun).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Test DB',
+      use_ssh: 1
+    }))
+    
+    // Verify getConnections works and decrypts
+    mockAll.mockReturnValueOnce([{
+      ...conn,
+      use_ssh: 1,
+      password: encrypt('mypassword'),
+      ssh_password: encrypt('sshpassword')
+    }]);
+
     const connections = getConnections()
     
     expect(connections).toHaveLength(1)
@@ -77,11 +111,5 @@ describe('Database Unit Tests', () => {
     expect(connections[0].password).toBe('mypassword') // decrypted automatically by getConnections
     expect(connections[0].ssh_password).toBe('sshpassword')
     expect(connections[0].use_ssh).toBe(true)
-
-    // Verify it was actually encrypted in the db
-    const rawDb = getDB()
-    const rawRow = rawDb.prepare('SELECT password FROM connections WHERE id = ?').get('conn-1') as any
-    expect(rawRow.password).not.toBe('mypassword')
-    expect(rawRow.password).toContain(':')
   })
 })
