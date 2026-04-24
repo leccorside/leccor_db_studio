@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Play, Save, X, Database, Plus } from 'lucide-react';
-import Editor, { useMonaco } from '@monaco-editor/react';
+import SimpleEditor from 'react-simple-code-editor';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-sql';
 
 interface Tab {
   id: string;
@@ -16,33 +18,29 @@ interface EditorAreaProps {
 }
 
 export function EditorArea({ onExecute, isExecuting, activeConnection, externalSqlRequest }: EditorAreaProps) {
-  const monaco = useMonaco();
   const [tabs, setTabs] = useState<Tab[]>([
     { id: '1', name: 'query_1.sql', content: 'SELECT * FROM users;' }
   ]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
+  const [selectedSql, setSelectedSql] = useState<string>('');
+  const [isSavedStatus, setIsSavedStatus] = useState(false);
 
+  // Load saved tabs on mount
   useEffect(() => {
-    if (monaco) {
-      monaco.editor.defineTheme('leccor-dark', {
-        base: 'vs-dark',
-        inherit: true,
-        rules: [
-          { token: 'keyword.sql', foreground: 'c678dd' },
-          { token: 'identifier.sql', foreground: 'e5c07b' },
-          { token: 'string.sql', foreground: '98c379' },
-          { token: 'number.sql', foreground: 'd19a66' },
-        ],
-        colors: {
-          'editor.background': '#0a0a0c',
-          'editor.lineHighlightBackground': '#ffffff0a',
-          'editorLineNumber.foreground': '#4f4f59',
-          'editorIndentGuide.background': '#27272a',
+    window.api.db.getSetting('workspace_tabs').then(saved => {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.tabs && parsed.tabs.length > 0) {
+            setTabs(parsed.tabs);
+            setActiveTabId(parsed.activeTabId || parsed.tabs[0].id);
+          }
+        } catch (e) {
+          console.error("Failed to parse saved tabs", e);
         }
-      });
-      monaco.editor.setTheme('leccor-dark');
-    }
-  }, [monaco]);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (externalSqlRequest) {
@@ -90,8 +88,41 @@ export function EditorArea({ onExecute, isExecuting, activeConnection, externalS
   };
 
   const handleEditorChange = (value: string | undefined) => {
-    if (!value || !activeTabId) return;
+    if (value === undefined || !activeTabId) return;
     setTabs(tabs.map(t => t.id === activeTabId ? { ...t, content: value } : t));
+  };
+
+  const handleSelect = (e: any) => {
+    const start = e.target.selectionStart;
+    const end = e.target.selectionEnd;
+    if (start !== undefined && end !== undefined && start !== end) {
+      setSelectedSql(e.target.value.substring(start, end));
+    } else {
+      setSelectedSql('');
+    }
+  };
+
+  const handleRun = () => {
+    if (!activeTab) return;
+    
+    let sqlToRun = activeTab.content;
+    if (selectedSql.trim()) {
+      sqlToRun = selectedSql;
+    }
+    
+    if (sqlToRun.trim()) {
+      onExecute(sqlToRun);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      await window.api.db.saveSetting('workspace_tabs', JSON.stringify({ tabs, activeTabId }));
+      setIsSavedStatus(true);
+      setTimeout(() => setIsSavedStatus(false), 2000);
+    } catch (e) {
+      console.error("Failed to save tabs", e);
+    }
   };
 
   return (
@@ -127,40 +158,61 @@ export function EditorArea({ onExecute, isExecuting, activeConnection, externalS
 
       <div className="flex border-b border-border bg-panel/30 p-2 gap-2">
         <button 
-          onClick={() => activeTab && onExecute(activeTab.content)}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleRun}
           disabled={!activeTab || isExecuting || !activeConnection}
           className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors shadow-sm"
         >
           {isExecuting ? <Database size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
           {isExecuting ? 'Running...' : 'Run'}
         </button>
-        <button className="flex items-center gap-2 px-3 py-1.5 bg-panel hover:bg-panel/80 text-zinc-300 rounded-md text-sm font-medium transition-colors border border-border shadow-sm">
-          <Save size={14} />
-          Save
+        {isExecuting && (
+          <button 
+            onClick={() => window.api.pg.cancelQuery()}
+            className="flex items-center gap-2 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors shadow-sm"
+          >
+            <X size={14} />
+            Cancel
+          </button>
+        )}
+        <button 
+          onClick={handleSave}
+          className="flex items-center gap-2 px-3 py-1.5 bg-panel hover:bg-panel/80 text-zinc-300 rounded-md text-sm font-medium transition-colors border border-border shadow-sm"
+        >
+          {isSavedStatus ? <Save size={14} className="text-green-400" /> : <Save size={14} />}
+          {isSavedStatus ? 'Saved!' : 'Save'}
         </button>
       </div>
 
-      <div className="flex-1 bg-background relative py-2">
+      <style dangerouslySetInnerHTML={{__html: `
+        .leccor-simple-editor {
+          font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+          font-size: 14px !important;
+          min-height: 100% !important;
+        }
+        .leccor-simple-editor textarea {
+          outline: none !important;
+        }
+        .token.keyword { color: #c678dd; font-weight: bold; }
+        .token.string { color: #98c379; }
+        .token.number { color: #d19a66; }
+        .token.operator { color: #56b6c2; }
+        .token.punctuation { color: #abb2bf; }
+        .token.function { color: #61afef; }
+        .token.boolean { color: #d19a66; }
+      `}} />
+      <div className="flex-1 bg-background overflow-auto p-4">
         {activeTab && (
-          <Editor
-            height="100%"
-            language="sql"
-            theme="leccor-dark"
+          <SimpleEditor
             value={activeTab.content}
-            onChange={handleEditorChange}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 14,
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-              padding: { top: 16 },
-              scrollBeyondLastLine: false,
-              roundedSelection: false,
-              renderLineHighlight: "all",
-              scrollbar: {
-                verticalScrollbarSize: 8,
-                horizontalScrollbarSize: 8,
-              }
-            }}
+            onValueChange={handleEditorChange}
+            onSelect={handleSelect}
+            onKeyUp={handleSelect}
+            onMouseUp={handleSelect}
+            highlight={code => Prism.highlight(code, Prism.languages.sql, 'sql')}
+            padding={0}
+            className="leccor-simple-editor w-full text-zinc-300"
+            textareaClassName="focus:outline-none focus:ring-0 selection:bg-accent/30"
           />
         )}
       </div>

@@ -15,7 +15,11 @@ const api = {
   pg: {
     testConnection: (config: any) => ipcRenderer.invoke('pg:testConnection', config),
     getMetadata: (config: any) => ipcRenderer.invoke('pg:getMetadata', config),
-    executeQuery: (config: any, sql: string) => ipcRenderer.invoke('pg:executeQuery', config, sql)
+    executeQuery: (config: any, sql: string) => ipcRenderer.invoke('pg:executeQuery', config, sql),
+    cancelQuery: () => ipcRenderer.invoke('pg:cancelQuery')
+  },
+  dialog: {
+    openFile: () => ipcRenderer.invoke('dialog:openFile')
   }
 }
 

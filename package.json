@@ -47,12 +47,15 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-table": "^8.21.3",
+    "@types/prismjs": "^1.26.6",
     "better-sqlite3": "^12.9.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.11.0",
     "pg": "^8.20.0",
+    "prismjs": "^1.30.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-simple-code-editor": "^0.14.1",
     "ssh2": "^1.17.0",
     "tailwind-merge": "^3.5.0"
   }

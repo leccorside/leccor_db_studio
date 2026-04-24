@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Database, Server, Plus, MoreVertical, Loader2, FileText, Code } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Server, Plus, MoreVertical, Loader2, FileText, Code, CheckCircle2, XCircle } from 'lucide-react';
 
 interface SchemaItem {
   name: string;
@@ -22,9 +22,10 @@ interface SidebarProps {
   activeConnectionId?: string;
   onConnectionSelect?: (conn: any) => void;
   onGenerateSql?: (sql: string) => void;
+  onEditConnection?: (connId: string) => void;
 }
 
-export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql }: SidebarProps) {
+export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql, onEditConnection }: SidebarProps) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>({});
   const [metadataCache, setMetadataCache] = useState<Record<string, Schema[]>>({});
@@ -36,9 +37,10 @@ export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql 
     visible: boolean;
     x: number;
     y: number;
-    schema: string;
-    table: string;
+    type: 'table' | 'connection';
     connId: string;
+    schema?: string;
+    table?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -54,13 +56,15 @@ export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql 
     setConnections(data);
   };
 
-  const toggleConnection = async (conn: any) => {
-    if (onConnectionSelect) onConnectionSelect(conn);
+  const toggleConnection = async (conn: any, forceRefresh = false) => {
+    if (onConnectionSelect && activeConnectionId !== conn.id) {
+      onConnectionSelect(conn);
+    }
     
-    const isExpanded = !!expandedConns[conn.id];
-    setExpandedConns(prev => ({ ...prev, [conn.id]: !isExpanded }));
+    const isExpanded = forceRefresh ? false : !!expandedConns[conn.id];
+    setExpandedConns(prev => ({ ...prev, [conn.id]: forceRefresh ? true : !isExpanded }));
 
-    if (!isExpanded && !metadataCache[conn.id]) {
+    if ((!isExpanded || forceRefresh) && (!metadataCache[conn.id] || forceRefresh)) {
       setLoadingMetadata(prev => ({ ...prev, [conn.id]: true }));
       const result = await window.api.pg.getMetadata(conn);
       if (result.success && result.data) {
@@ -77,14 +81,27 @@ export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql 
     setExpandedSchemas(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleContextMenu = (e: React.MouseEvent, connId: string, schema: string, table: string) => {
+  const handleTableContextMenu = (e: React.MouseEvent, connId: string, schema: string, table: string) => {
     e.preventDefault();
     setContextMenu({
       visible: true,
       x: e.pageX,
       y: e.pageY,
+      type: 'table',
+      connId,
       schema,
-      table,
+      table
+    });
+  };
+
+  const handleConnectionContextMenu = (e: React.MouseEvent, connId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: e.pageX,
+      y: e.pageY,
+      type: 'connection',
       connId
     });
   };
@@ -143,10 +160,22 @@ ORDER BY ordinal_position;
             <div key={conn.id}>
               <div 
                 onClick={() => toggleConnection(conn)}
+                onContextMenu={(e) => handleConnectionContextMenu(e, conn.id)}
                 className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-panel cursor-pointer ${activeConnectionId === conn.id ? 'bg-panel text-accent font-medium' : 'text-zinc-300'}`}
               >
                 {expandedConns[conn.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                <Server size={14} className="text-accent" />
+                <div className="relative">
+                  <Server size={14} className={activeConnectionId === conn.id ? "text-accent" : "text-zinc-500"} />
+                  {activeConnectionId === conn.id ? (
+                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full">
+                      <CheckCircle2 size={10} className="text-green-500 bg-background rounded-full" />
+                    </div>
+                  ) : (
+                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full">
+                      <XCircle size={10} className="text-zinc-500 bg-background rounded-full" />
+                    </div>
+                  )}
+                </div>
                 <span className="text-sm truncate select-none">{conn.name}</span>
               </div>
               
@@ -177,7 +206,7 @@ ORDER BY ordinal_position;
                             {schema.tables.map(table => (
                               <div 
                                 key={table.name} 
-                                onContextMenu={(e) => handleContextMenu(e, conn.id, schema.name, table.name)}
+                                onContextMenu={(e) => handleTableContextMenu(e, conn.id, schema.name, table.name)}
                                 className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-panel cursor-pointer text-zinc-400 group"
                               >
                                 <span className="text-xs text-blue-400 font-mono opacity-80 group-hover:opacity-100">
@@ -210,21 +239,95 @@ ORDER BY ordinal_position;
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1.5 text-xs text-zinc-500 font-medium border-b border-border/50 mb-1 truncate">
-            {contextMenu.schema}.{contextMenu.table}
-          </div>
-          <button 
-            onClick={() => { handleGenerateSelect(); setContextMenu(null); }}
-            className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 flex items-center gap-2 transition-colors"
-          >
-            <FileText size={14} /> SELECT Statement
-          </button>
-          <button 
-            onClick={() => { handleGenerateDDL(); setContextMenu(null); }}
-            className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 flex items-center gap-2 transition-colors"
-          >
-            <Code size={14} /> CREATE Statement
-          </button>
+          {contextMenu.type === 'table' ? (
+            <>
+              <div className="px-3 py-1.5 text-xs text-zinc-500 font-medium border-b border-border/50 mb-1 truncate">
+                {contextMenu.schema}.{contextMenu.table}
+              </div>
+              <button 
+                onClick={() => { handleGenerateSelect(); setContextMenu(null); }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 flex items-center gap-2 transition-colors"
+              >
+                <FileText size={14} /> SELECT Statement
+              </button>
+              <button 
+                onClick={() => { handleGenerateDDL(); setContextMenu(null); }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 flex items-center gap-2 transition-colors"
+              >
+                <Code size={14} /> CREATE Statement
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="px-3 py-1.5 text-xs text-zinc-500 font-medium border-b border-border/50 mb-1 truncate">
+                {connections.find(c => c.id === contextMenu.connId)?.name}
+              </div>
+              <button 
+                onClick={() => { 
+                  const conn = connections.find(c => c.id === contextMenu.connId);
+                  if (conn && onConnectionSelect) {
+                    onConnectionSelect(conn);
+                    if (onGenerateSql) onGenerateSql('-- Nova Query');
+                  }
+                  setContextMenu(null); 
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
+              >
+                SQL Editor
+              </button>
+              <button 
+                onClick={() => { 
+                  if (onEditConnection) onEditConnection(contextMenu.connId);
+                  setContextMenu(null); 
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
+              >
+                Editar conexão
+              </button>
+              <button 
+                onClick={() => { 
+                  if (onConnectionSelect) {
+                    if (activeConnectionId === contextMenu.connId) {
+                      onConnectionSelect(null); // Desconectar
+                    } else {
+                      const conn = connections.find(c => c.id === contextMenu.connId);
+                      if (conn) onConnectionSelect(conn); // Conectar
+                    }
+                  }
+                  setContextMenu(null); 
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
+              >
+                {activeConnectionId === contextMenu.connId ? 'Desconectar' : 'Conectar'}
+              </button>
+              <button 
+                onClick={() => { 
+                  const conn = connections.find(c => c.id === contextMenu.connId);
+                  if (conn) toggleConnection(conn, true);
+                  setContextMenu(null); 
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
+              >
+                Refresh
+              </button>
+              <div className="border-t border-border/50 my-1"></div>
+              <button 
+                onClick={async () => { 
+                  if (confirm('Tem certeza que deseja excluir esta conexão?')) {
+                    await window.api.db.deleteConnection(contextMenu.connId);
+                    if (activeConnectionId === contextMenu.connId && onConnectionSelect) {
+                      onConnectionSelect(null);
+                    }
+                    loadConnections();
+                  }
+                  setContextMenu(null); 
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-red-500/20 text-red-400 transition-colors"
+              >
+                Delete
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -17,5 +17,8 @@ interface Window {
       getMetadata: (config: any) => Promise<{success: boolean, data?: any[], error?: string}>;
       executeQuery: (config: any, sql: string) => Promise<{success: boolean, data?: any, error?: string}>;
     };
+    dialog: {
+      openFile: () => Promise<string | null>;
+    };
   };
 }

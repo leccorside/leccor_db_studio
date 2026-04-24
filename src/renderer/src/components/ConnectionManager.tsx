@@ -18,9 +18,9 @@ interface Connection {
   ssh_keyfile?: string
 }
 
-export function ConnectionManager({ onClose }: { onClose: () => void }) {
+export function ConnectionManager({ onClose, initialSelectedId }: { onClose: () => void, initialSelectedId?: string }) {
   const [connections, setConnections] = useState<Connection[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId || null)
   const [formData, setFormData] = useState<Partial<Connection>>({ driver: 'postgres', port: 5432 })
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
@@ -32,6 +32,10 @@ export function ConnectionManager({ onClose }: { onClose: () => void }) {
   const loadConnections = async () => {
     const data = await window.api.db.getConnections()
     setConnections(data)
+    if (initialSelectedId) {
+      const conn = data.find((c: any) => c.id === initialSelectedId)
+      if (conn) setFormData(conn)
+    }
   }
 
   const handleSelect = (conn: Connection) => {
@@ -49,12 +53,20 @@ export function ConnectionManager({ onClose }: { onClose: () => void }) {
   }
 
   const handleSave = async () => {
-    if (!formData.name || !formData.driver) return
-    const idToSave = selectedId || crypto.randomUUID()
-    const connToSave = { ...formData, id: idToSave }
-    await window.api.db.saveConnection(connToSave)
-    await loadConnections()
-    setSelectedId(idToSave)
+    try {
+      if (!formData.name || !formData.driver) return
+      const idToSave = selectedId || crypto.randomUUID()
+      const connToSave = { ...formData, id: idToSave }
+      await window.api.db.saveConnection(connToSave)
+      await loadConnections()
+      setSelectedId(idToSave)
+      setTestStatus('success')
+      setTestMessage('Conexão salva com sucesso!')
+    } catch (e: any) {
+      console.error("Erro ao salvar:", e)
+      setTestStatus('error')
+      setTestMessage('Erro ao salvar no banco: ' + e.message)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -233,7 +245,10 @@ export function ConnectionManager({ onClose }: { onClose: () => void }) {
                       type="number" 
                       className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
                       value={formData.ssh_port || ''}
-                      onChange={e => setFormData({...formData, ssh_port: parseInt(e.target.value)})}
+                      onChange={e => {
+                        const val = parseInt(e.target.value);
+                        setFormData({...formData, ssh_port: isNaN(val) ? undefined : val})
+                      }}
                       placeholder="22"
                     />
                   </div>
@@ -258,13 +273,29 @@ export function ConnectionManager({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="space-y-1.5 col-span-2">
                     <label className="text-sm font-medium text-zinc-400">Private Key File (Opcional)</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
-                      value={formData.ssh_keyfile || ''}
-                      onChange={e => setFormData({...formData, ssh_keyfile: e.target.value})}
-                      placeholder="Ex: ~/.ssh/id_rsa"
-                    />
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        className="flex-1 bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
+                        value={formData.ssh_keyfile || ''}
+                        onChange={e => setFormData({...formData, ssh_keyfile: e.target.value})}
+                        placeholder="Ex: ~/.ssh/id_rsa"
+                      />
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          if (window.api.dialog?.openFile) {
+                            const filePath = await window.api.dialog.openFile()
+                            if (filePath) {
+                              setFormData({...formData, ssh_keyfile: filePath})
+                            }
+                          }
+                        }}
+                        className="px-3 py-2 bg-panel border border-border hover:bg-background rounded-md text-sm text-zinc-300 font-medium transition-colors"
+                      >
+                        Procurar...
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

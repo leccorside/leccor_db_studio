@@ -1,8 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting, saveQueryHistory, getQueryHistory } from './database'
-import { testConnection, getMetadata, executeQuery } from './postgres'
+import { testConnection, getMetadata, executeQuery, cancelQuery } from './postgres'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -50,6 +50,17 @@ app.whenReady().then(() => {
   ipcMain.handle('pg:testConnection', (_, config) => testConnection(config))
   ipcMain.handle('pg:getMetadata', (_, config) => getMetadata(config))
   ipcMain.handle('pg:executeQuery', (_, config, sql) => executeQuery(config, sql))
+  ipcMain.handle('pg:cancelQuery', () => cancelQuery())
+
+  ipcMain.handle('dialog:openFile', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile']
+    })
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0]
+    }
+    return null
+  })
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.leccor.dbstudio')

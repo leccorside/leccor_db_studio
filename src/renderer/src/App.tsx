@@ -13,6 +13,7 @@ function App() {
   const [queryError, setQueryError] = useState<string | null>(null)
   const [lastQuerySql, setLastQuerySql] = useState<string>('')
   const [externalSqlRequest, setExternalSqlRequest] = useState<{ sql: string, ts: number } | null>(null)
+  const [editingConnId, setEditingConnId] = useState<string | undefined>()
 
   const handleExecute = async (sql: string) => {
     if (!activeConnection) {
@@ -55,17 +56,30 @@ function App() {
     setExternalSqlRequest({ sql, ts: Date.now() })
   }
 
+  const handleEditConnection = (connId: string) => {
+    setEditingConnId(connId)
+    setShowConnections(true)
+  }
+
   return (
     <div className="flex h-screen w-screen bg-background overflow-hidden text-white font-sans">
-      <ActivityBar onOpenConnections={() => setShowConnections(true)} />
-      <Sidebar activeConnectionId={activeConnection?.id} onConnectionSelect={setActiveConnection} onGenerateSql={handleGenerateSql} />
+      <ActivityBar onOpenConnections={() => {setEditingConnId(undefined); setShowConnections(true)}} />
+      <Sidebar 
+        activeConnectionId={activeConnection?.id} 
+        onConnectionSelect={setActiveConnection} 
+        onGenerateSql={handleGenerateSql} 
+        onEditConnection={handleEditConnection}
+      />
       <div className="flex-1 flex flex-col min-w-0">
         <EditorArea onExecute={handleExecute} isExecuting={isExecuting} activeConnection={activeConnection} externalSqlRequest={externalSqlRequest} />
-        <BottomPanel result={queryResult} error={queryError} activeConnection={activeConnection} lastQuerySql={lastQuerySql} />
+        <BottomPanel result={queryResult} error={queryError} activeConnection={activeConnection} lastQuerySql={lastQuerySql} onRefresh={() => handleExecute(lastQuerySql)} />
       </div>
       
       {showConnections && (
-        <ConnectionManager onClose={() => setShowConnections(false)} />
+        <ConnectionManager 
+          onClose={() => {setShowConnections(false); setEditingConnId(undefined)}} 
+          initialSelectedId={editingConnId} 
+        />
       )}
     </div>
   )
