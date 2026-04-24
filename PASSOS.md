@@ -39,7 +39,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 
 ## ✍️ FASE 3: Editor e Resultados
 
-- [ ] **Passo 6: Integração Monaco Editor**
+- [x] **Passo 6: Integração Monaco Editor**
     - **Descrição**: Integrar o editor do VS Code (Monaco) com suporte a sintaxe SQL e múltiplas abas.
     - **Requisitos**: `@monaco-editor/react`, sistema de abas de estado.
     - **Commit**: `feat: sql editor integration with monaco and tabs`
@@ -97,3 +97,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: connection manager with postgres support`
 - **Passo 5 concluído**: Implementado o `pg:getMetadata` para buscar schemas e tabelas via query no PostgreSQL. Componente `Sidebar` atualizado para carregar de forma preguiçosa (lazy load) a árvore de Conexões -> Schemas -> Tabelas/Views usando cache local no React.
   - **Commit**: `feat: database explorer tree with schemas and tables`
+- **Passo 6 concluído**: Instalado `@monaco-editor/react`. Atualizada a `EditorArea` para suportar múltiplas abas dinâmicas com estado local. Integrado o Monaco Editor com tema dark personalizado (`leccor-dark`), sem minimap e formatado para a melhor experiência na escrita de queries.
+  - **Commit**: `feat: sql editor integration with monaco and tabs`
