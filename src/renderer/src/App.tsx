@@ -11,6 +11,7 @@ function App() {
   const [queryResult, setQueryResult] = useState<any>(null)
   const [isExecuting, setIsExecuting] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
+  const [lastQuerySql, setLastQuerySql] = useState<string>('')
 
   const handleExecute = async (sql: string) => {
     if (!activeConnection) {
@@ -21,6 +22,7 @@ function App() {
     setIsExecuting(true)
     setQueryError(null)
     setQueryResult(null)
+    setLastQuerySql(sql)
 
     const result = await window.api.pg.executeQuery(activeConnection, sql)
     
@@ -54,7 +56,7 @@ function App() {
       <Sidebar activeConnectionId={activeConnection?.id} onConnectionSelect={setActiveConnection} />
       <div className="flex-1 flex flex-col min-w-0">
         <EditorArea onExecute={handleExecute} isExecuting={isExecuting} activeConnection={activeConnection} />
-        <BottomPanel result={queryResult} error={queryError} activeConnection={activeConnection} />
+        <BottomPanel result={queryResult} error={queryError} activeConnection={activeConnection} lastQuerySql={lastQuerySql} />
       </div>
       
       {showConnections && (

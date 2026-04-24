@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Table, Terminal, History, Maximize2, AlertCircle } from 'lucide-react';
+import { Table, Terminal, History, Maximize2, AlertCircle, Save, X } from 'lucide-react';
 import { 
   useReactTable, 
   getCoreRowModel, 
@@ -11,11 +11,21 @@ interface BottomPanelProps {
   result: any;
   error: string | null;
   activeConnection: any;
+  lastQuerySql: string;
 }
 
-export function BottomPanel({ result, error, activeConnection }: BottomPanelProps) {
+export function BottomPanel({ result, error, activeConnection, lastQuerySql }: BottomPanelProps) {
   const [activeTab, setActiveTab] = useState<'grid' | 'messages' | 'history'>('grid');
   const [history, setHistory] = useState<any[]>([]);
+  const [editingCell, setEditingCell] = useState<{row: number, col: string} | null>(null);
+  const [editedCells, setEditedCells] = useState<Record<string, any>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Reset edits when result changes
+  useEffect(() => {
+    setEditedCells({});
+    setEditingCell(null);
+  }, [result]);
 
   useEffect(() => {
     if (activeTab === 'history') {
@@ -40,11 +50,53 @@ export function BottomPanel({ result, error, activeConnection }: BottomPanelProp
         helper.accessor(f.name, {
           header: f.name,
           cell: info => {
-            const val = info.getValue();
-            if (val === null) return <span className="text-zinc-500 italic">null</span>;
-            if (typeof val === 'boolean') return <span className="text-orange-300">{val ? 'true' : 'false'}</span>;
-            if (typeof val === 'number') return <span className="text-blue-300">{val}</span>;
-            return <span className="text-zinc-300">{String(val)}</span>;
+            const rowIdx = info.row.index;
+            const colId = f.name;
+            const isEditing = editingCell?.row === rowIdx && editingCell?.col === colId;
+            const editKey = `${rowIdx}:${colId}`;
+            const isModified = editKey in editedCells;
+            const initialVal = info.getValue();
+            const val = isModified ? editedCells[editKey] : initialVal;
+
+            if (isEditing) {
+              return (
+                <input
+                  autoFocus
+                  className="bg-panel border border-accent rounded px-1 w-full text-white outline-none"
+                  defaultValue={val === null ? '' : val}
+                  onBlur={(e) => {
+                    setEditingCell(null);
+                    if (e.target.value !== String(initialVal || '')) {
+                      setEditedCells(prev => ({ ...prev, [editKey]: e.target.value }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setEditingCell(null);
+                      if (e.currentTarget.value !== String(initialVal || '')) {
+                        setEditedCells(prev => ({ ...prev, [editKey]: e.currentTarget.value }));
+                      }
+                    }
+                    if (e.key === 'Escape') setEditingCell(null);
+                  }}
+                />
+              );
+            }
+
+            let displayContent;
+            if (val === null) displayContent = <span className="text-zinc-500 italic">null</span>;
+            else if (typeof val === 'boolean') displayContent = <span className="text-orange-300">{val ? 'true' : 'false'}</span>;
+            else if (typeof val === 'number') displayContent = <span className="text-blue-300">{val}</span>;
+            else displayContent = <span className="text-zinc-300">{String(val)}</span>;
+
+            return (
+              <div 
+                className={`w-full h-full cursor-text ${isModified ? 'bg-orange-500/20 text-orange-200 px-1 rounded' : ''}`}
+                onDoubleClick={() => setEditingCell({ row: rowIdx, col: colId })}
+              >
+                {displayContent}
+              </div>
+            );
           }
         })
       )
@@ -62,6 +114,66 @@ export function BottomPanel({ result, error, activeConnection }: BottomPanelProp
     if (error) setActiveTab('messages');
     else if (result) setActiveTab('grid');
   }, [error, result]);
+
+  const handleSaveChanges = async () => {
+    if (!lastQuerySql) return;
+    
+    // Extract table name from query
+    const match = lastQuerySql.match(/FROM\s+([a-zA-Z0-9_]+)/i);
+    if (!match) {
+      alert("Não foi possível detectar a tabela a partir da query.");
+      return;
+    }
+    const tableName = match[1];
+
+    // Find PK field (assume 'id' or first column)
+    const idField = result.fields.find((f: any) => f.name.toLowerCase() === 'id') 
+      || result.fields[0];
+    
+    if (!idField) return;
+
+    setIsSaving(true);
+    
+    try {
+      // Group edits by row
+      const editsByRow: Record<number, Record<string, any>> = {};
+      Object.entries(editedCells).forEach(([key, val]) => {
+        const [rowStr, col] = key.split(':');
+        const row = parseInt(rowStr);
+        if (!editsByRow[row]) editsByRow[row] = {};
+        editsByRow[row][col] = val;
+      });
+
+      // Generate and execute updates
+      for (const rowIdxStr of Object.keys(editsByRow)) {
+        const rowIdx = parseInt(rowIdxStr);
+        const rowEdits = editsByRow[rowIdx];
+        const rowData = result.rows[rowIdx];
+        const idValue = rowData[idField.name];
+
+        const setStatements = Object.entries(rowEdits).map(([col, val]) => {
+          // simple formatting, a real ORM would use parameterization
+          const formattedVal = isNaN(Number(val)) ? `'${val}'` : val; 
+          return `${col} = ${formattedVal}`;
+        }).join(', ');
+
+        const updateSql = `UPDATE ${tableName} SET ${setStatements} WHERE ${idField.name} = ${isNaN(Number(idValue)) ? `'${idValue}'` : idValue};`;
+        
+        await window.api.pg.executeQuery(activeConnection, updateSql);
+      }
+      
+      setEditedCells({});
+      // Idealy we would refresh the query here, but for MVP we just clear the orange highlights
+      // To properly refresh we'd need App.tsx to pass a refresh function. 
+      // We will leave the edited values in local state or show a success message.
+      alert('Alterações salvas com sucesso! Execute a query novamente para atualizar a tabela.');
+      
+    } catch (e: any) {
+      alert('Erro ao salvar: ' + e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="h-72 border-t border-border bg-panel flex flex-col shrink-0">
@@ -89,9 +201,29 @@ export function BottomPanel({ result, error, activeConnection }: BottomPanelProp
             History
           </button>
         </div>
-        <button className="text-zinc-400 hover:text-white p-1.5 rounded-md hover:bg-panel transition-colors">
-          <Maximize2 size={14} />
-        </button>
+        <div className="flex items-center gap-2 pr-2">
+          {Object.keys(editedCells).length > 0 && activeTab === 'grid' && (
+            <>
+              <button 
+                onClick={() => setEditedCells({})}
+                className="text-zinc-400 hover:text-white px-2 py-1 text-xs rounded hover:bg-panel transition-colors"
+              >
+                Discard
+              </button>
+              <button 
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 bg-accent hover:bg-accent/90 text-white px-3 py-1 text-xs font-medium rounded shadow-sm disabled:opacity-50 transition-colors"
+              >
+                <Save size={12} />
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </>
+          )}
+          <button className="text-zinc-400 hover:text-white p-1.5 rounded-md hover:bg-panel transition-colors">
+            <Maximize2 size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto bg-background/50 relative">

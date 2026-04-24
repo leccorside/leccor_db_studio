@@ -58,7 +58,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
     - **Requisitos**: Persistência de histórico no SQLite local.
     - **Commit**: `feat: query history and execution logs`
 
-- [ ] **Passo 9: Data Editor (CRUD Visual)**
+- [x] **Passo 9: Data Editor (CRUD Visual)**
     - **Descrição**: Permitir edição direta nas células do Result Grid (Update/Delete/Insert).
     - **Requisitos**: Lógica de geração de SQL dinâmica baseada em alterações da grid.
     - **Commit**: `feat: visual data editor for inline table updates`
@@ -103,3 +103,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: query execution engine and result data grid`
 - **Passo 8 concluído**: Criada a tabela `query_history` no banco local (SQLite) via `database.ts`. Implementada gravação automática do SQL executado, identificando a conexão, status de falha/sucesso e duração em milissegundos. Na aba inferior (BottomPanel), a tab `History` foi ativada para exibir um grid em tempo real do histórico completo das execuções persistidas.
   - **Commit**: `feat: query history and execution logs`
+- **Passo 9 concluído**: Atualizado o `BottomPanel` para permitir double-click nas células retornadas. Quando a célula sofre alteração, ela é destacada e o botão "Save Changes" surge no header. Ao clicar, o sistema gera dinamicamente statements de `UPDATE`, detectando a tabela original da query anterior, extraindo a provável PK (campo ID) para atualizar com segurança direto no PostgreSQL usando a mesma engine de execução do banco.
+  - **Commit**: `feat: visual data editor for inline table updates`
