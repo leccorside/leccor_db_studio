@@ -10,5 +10,8 @@ interface Window {
       getSetting: (key: string) => Promise<string | null>;
       saveSetting: (key: string, value: string) => Promise<any>;
     };
+    pg: {
+      testConnection: (config: any) => Promise<{success: boolean, error?: string}>;
+    };
   };
 }

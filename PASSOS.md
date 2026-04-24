@@ -25,7 +25,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 
 ## 🔌 FASE 2: Conectividade (O Coração)
 
-- [ ] **Passo 4: Gerenciador de Conexões (CRUD)**
+- [x] **Passo 4: Gerenciador de Conexões (CRUD)**
     - **Descrição**: Tela para criar, editar e excluir conexões. Implementar "Test Connection" para PostgreSQL primeiro.
     - **Requisitos**: Driver `pg`, lógica de validação de conexão.
     - **Commit**: `feat: connection manager with postgres support`
@@ -93,3 +93,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: main dashboard layout and shell components`
 - **Passo 3 concluído**: Implementado banco de dados local com `better-sqlite3`. Criada a persistência de "settings" e "connections". Funções IPC expostas no preload e tipadas no TypeScript.
   - **Commit**: `feat: local storage for application settings and connections`
+- **Passo 4 concluído**: Criado o módulo `postgres.ts` no processo principal para testar conexões com `pg`. Criado o componente React `ConnectionManager.tsx` para gerenciar (Criar, Editar, Excluir, Testar) as conexões. Integrado à interface na ActivityBar.
+  - **Commit**: `feat: connection manager with postgres support`
