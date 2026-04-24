@@ -152,10 +152,20 @@ export function saveConnection(connection: any) {
       updated_at = CURRENT_TIMESTAMP
   `)
   return stmt.run({
-    ...connection,
+    id: connection.id,
+    name: connection.name,
+    driver: connection.driver,
+    host: connection.host || null,
+    port: connection.port || null,
+    username: connection.username || null,
+    password: encrypt(connection.password) || null,
+    database: connection.database || null,
     use_ssh: connection.use_ssh ? 1 : 0,
-    password: encrypt(connection.password),
-    ssh_password: encrypt(connection.ssh_password)
+    ssh_host: connection.ssh_host || null,
+    ssh_port: connection.ssh_port || null,
+    ssh_username: connection.ssh_username || null,
+    ssh_password: encrypt(connection.ssh_password) || null,
+    ssh_keyfile: connection.ssh_keyfile || null
   })
 }
 
