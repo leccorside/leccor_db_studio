@@ -11,7 +11,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
     - **Requisitos**: `electron`, `vite`, `react`, `typescript`, `tailwindcss` (para UI premium).
     - **Commit**: `feat: initial electron + react + vite setup`
 
-- [ ] **Passo 2: Layout Shell (UI Premium)**
+- [x] **Passo 2: Layout Shell (UI Premium)**
     - **Descrição**: Criar a interface principal com Sidebar (Explorer), Área Central (Editor/Tabs) e Painel Inferior (Resultados/Logs).
     - **Requisitos**: Design system básico, componentes de layout responsivos.
     - **Commit**: `feat: main dashboard layout and shell components`
@@ -89,3 +89,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 ## ✅ Resumo do Progresso
 - **Passo 1 concluído**: Estrutura Electron + React (Vite) configurada. TailwindCSS integrado com paleta Dark Premium. Configuração de IPC, Preload e Main Process pronta. Docker Compose para bancos de teste adicionado.
   - **Commit**: `feat: initial electron + react + vite setup`
+- **Passo 2 concluído**: Layout Shell UI Premium criado com componentes `ActivityBar`, `Sidebar`, `EditorArea` e `BottomPanel`, todos com design moderno, responsivo e baseado no TailwindCSS.
+  - **Commit**: `feat: main dashboard layout and shell components`
