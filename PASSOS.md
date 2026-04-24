@@ -30,7 +30,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
     - **Requisitos**: Driver `pg`, lógica de validação de conexão.
     - **Commit**: `feat: connection manager with postgres support`
 
-- [ ] **Passo 5: Database Explorer (Árvore de Objetos)**
+- [x] **Passo 5: Database Explorer (Árvore de Objetos)**
     - **Descrição**: Implementar a árvore lateral que lista Databases, Schemas e Tabelas.
     - **Requisitos**: Queries de metadados do sistema, componente de árvore com lazy loading.
     - **Commit**: `feat: database explorer tree with schemas and tables`
@@ -95,3 +95,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: local storage for application settings and connections`
 - **Passo 4 concluído**: Criado o módulo `postgres.ts` no processo principal para testar conexões com `pg`. Criado o componente React `ConnectionManager.tsx` para gerenciar (Criar, Editar, Excluir, Testar) as conexões. Integrado à interface na ActivityBar.
   - **Commit**: `feat: connection manager with postgres support`
+- **Passo 5 concluído**: Implementado o `pg:getMetadata` para buscar schemas e tabelas via query no PostgreSQL. Componente `Sidebar` atualizado para carregar de forma preguiçosa (lazy load) a árvore de Conexões -> Schemas -> Tabelas/Views usando cache local no React.
+  - **Commit**: `feat: database explorer tree with schemas and tables`

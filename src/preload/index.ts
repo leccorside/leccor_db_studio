@@ -11,7 +11,8 @@ const api = {
     saveSetting: (key: string, value: string) => ipcRenderer.invoke('db:saveSetting', key, value),
   },
   pg: {
-    testConnection: (config: any) => ipcRenderer.invoke('pg:testConnection', config)
+    testConnection: (config: any) => ipcRenderer.invoke('pg:testConnection', config),
+    getMetadata: (config: any) => ipcRenderer.invoke('pg:getMetadata', config)
   }
 }
 

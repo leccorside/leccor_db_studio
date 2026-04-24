@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting } from './database'
-import { testConnection } from './postgres'
+import { testConnection, getMetadata } from './postgres'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -46,6 +46,7 @@ app.whenReady().then(() => {
   ipcMain.handle('db:getSetting', (_, key) => getSetting(key))
   ipcMain.handle('db:saveSetting', (_, key, value) => saveSetting(key, value))
   ipcMain.handle('pg:testConnection', (_, config) => testConnection(config))
+  ipcMain.handle('pg:getMetadata', (_, config) => getMetadata(config))
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.leccor.dbstudio')

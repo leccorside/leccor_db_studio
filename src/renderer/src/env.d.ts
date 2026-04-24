@@ -12,6 +12,7 @@ interface Window {
     };
     pg: {
       testConnection: (config: any) => Promise<{success: boolean, error?: string}>;
+      getMetadata: (config: any) => Promise<{success: boolean, data?: any[], error?: string}>;
     };
   };
 }
