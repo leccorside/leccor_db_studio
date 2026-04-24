@@ -80,7 +80,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
     - **Descrição**: Ações de clique direito para gerar "Script AS SELECT", "Create Table", etc.
     - **Commit**: `feat: sql generator and ddl script actions`
 
-- [ ] **Passo 12: Build Final (.exe)**
+- [x] **Passo 12: Build Final (.exe)**
     - **Descrição**: Configurar o `electron-builder` para gerar o executável Windows.
     - **Commit**: `chore: packaging and distribution setup`
 
@@ -109,3 +109,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: ssh tunneling and credential encryption`
 - **Passo 11 concluído**: Adicionado menu de contexto (botão direito) na listagem das tabelas do Sidebar. Ao clicar, um menu surge permitindo gerar "SELECT Statement" ou "CREATE Statement". Essa requisição sobe para o `App.tsx` e é injetada numa nova aba gerada dinamicamente pelo `EditorArea.tsx` contendo o DDL ou DML pronto daquela tabela de forma fluida.
   - **Commit**: `feat: sql generator and ddl script actions`
+- **Passo 12 concluído**: Configurado o script `"dist": "npm run build && electron-builder --win --x64"` no `package.json` juntamente com as propriedades do desenvolvedor. Criado o arquivo `electron-builder.yml` especificando build nativo de executável `.exe` baseados na tecnologia NSIS (Nullsoft Scriptable Install System) permitindo um Setup Premium One-Click (falso) com elevação de segurança Windows.
+  - **Commit**: `chore: packaging and distribution setup`

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "dist": "npm run build && electron-builder --win --x64",
     "postinstall": "electron-builder install-app-deps",
     "preview": "electron-vite preview"
   },
@@ -14,14 +15,15 @@
     "url": "git+https://github.com/leccorside/leccor_db_studio.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Leccorside <support@leccorside.com>",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/leccorside/leccor_db_studio/issues"
   },
   "homepage": "https://github.com/leccorside/leccor_db_studio#readme",
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
