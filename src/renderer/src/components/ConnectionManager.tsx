@@ -10,6 +10,12 @@ interface Connection {
   username?: string
   password?: string
   database?: string
+  use_ssh?: boolean
+  ssh_host?: string
+  ssh_port?: number
+  ssh_username?: string
+  ssh_password?: string
+  ssh_keyfile?: string
 }
 
 export function ConnectionManager({ onClose }: { onClose: () => void }) {
@@ -195,6 +201,73 @@ export function ConnectionManager({ onClose }: { onClose: () => void }) {
                   onChange={e => setFormData({...formData, password: e.target.value})}
                 />
               </div>
+            </div>
+
+            {/* SSH Tunnel Section */}
+            <div className="pt-4 border-t border-border">
+              <label className="flex items-center gap-2 cursor-pointer mb-4">
+                <input 
+                  type="checkbox" 
+                  checked={formData.use_ssh || false}
+                  onChange={e => setFormData({...formData, use_ssh: e.target.checked})}
+                  className="rounded border-zinc-700 bg-panel text-accent focus:ring-accent"
+                />
+                <span className="text-sm font-medium text-zinc-300">Usar Túnel SSH</span>
+              </label>
+
+              {formData.use_ssh && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5 col-span-2 md:col-span-1">
+                    <label className="text-sm font-medium text-zinc-400">SSH Host</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
+                      value={formData.ssh_host || ''}
+                      onChange={e => setFormData({...formData, ssh_host: e.target.value})}
+                      placeholder="Ex: 192.168.1.100"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2 md:col-span-1">
+                    <label className="text-sm font-medium text-zinc-400">SSH Porta</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
+                      value={formData.ssh_port || ''}
+                      onChange={e => setFormData({...formData, ssh_port: parseInt(e.target.value)})}
+                      placeholder="22"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2 md:col-span-1">
+                    <label className="text-sm font-medium text-zinc-400">SSH Usuário</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
+                      value={formData.ssh_username || ''}
+                      onChange={e => setFormData({...formData, ssh_username: e.target.value})}
+                      placeholder="root"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2 md:col-span-1">
+                    <label className="text-sm font-medium text-zinc-400">SSH Senha</label>
+                    <input 
+                      type="password" 
+                      className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
+                      value={formData.ssh_password || ''}
+                      onChange={e => setFormData({...formData, ssh_password: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="text-sm font-medium text-zinc-400">Private Key File (Opcional)</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent text-white"
+                      value={formData.ssh_keyfile || ''}
+                      onChange={e => setFormData({...formData, ssh_keyfile: e.target.value})}
+                      placeholder="Ex: ~/.ssh/id_rsa"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {testStatus !== 'idle' && (

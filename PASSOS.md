@@ -67,7 +67,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 
 ## 🔒 FASE 5: Segurança e SSH
 
-- [ ] **Passo 10: Túnel SSH e Segurança**
+- [x] **Passo 10: Túnel SSH e Segurança**
     - **Descrição**: Implementar conexões via túnel SSH e criptografia de senhas.
     - **Requisitos**: `ssh2`, `keytar` ou criptografia AES para senhas.
     - **Commit**: `feat: ssh tunneling and credential encryption`
@@ -105,3 +105,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: query history and execution logs`
 - **Passo 9 concluído**: Atualizado o `BottomPanel` para permitir double-click nas células retornadas. Quando a célula sofre alteração, ela é destacada e o botão "Save Changes" surge no header. Ao clicar, o sistema gera dinamicamente statements de `UPDATE`, detectando a tabela original da query anterior, extraindo a provável PK (campo ID) para atualizar com segurança direto no PostgreSQL usando a mesma engine de execução do banco.
   - **Commit**: `feat: visual data editor for inline table updates`
+- **Passo 10 concluído**: Instalado o módulo `ssh2` para suporte a túnel (Port Forwarding). Integrada uma wrapper `createClient` transparente em `postgres.ts` que escuta numa porta randômica local e redireciona os dados para o servidor SSH antes de entregar ao PG. A tabela do SQLite foi alterada para aceitar colunas de túnel SSH. Por fim, implementei criptografia local padrão banco (AES-256-CBC nativo via `crypto` do Node.js) que protege as senhas salvas no SQLite, usando uma chave única gerada randomicamente no ambiente do usuário.
+  - **Commit**: `feat: ssh tunneling and credential encryption`

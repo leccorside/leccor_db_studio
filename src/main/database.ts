@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
+import crypto from 'crypto'
 
 let db: Database.Database | null = null
 
@@ -39,7 +40,74 @@ export function initDB() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `)
+
+  // Safely add new columns for SSH
+  const sshCols = [
+    'use_ssh BOOLEAN DEFAULT 0',
+    'ssh_host TEXT',
+    'ssh_port INTEGER',
+    'ssh_username TEXT',
+    'ssh_password TEXT',
+    'ssh_keyfile TEXT'
+  ]
+
+  for (const col of sshCols) {
+    try {
+      db.exec(`ALTER TABLE connections ADD COLUMN ${col}`);
+    } catch (e: any) {
+      // Column already exists, ignore
+      if (!e.message.includes('duplicate column name')) {
+        console.error('Error adding column', e);
+      }
+    }
+  }
+
+  // Ensure encryption key exists
+  const keyObj = getSetting('encryption_key')
+  if (!keyObj) {
+    saveSetting('encryption_key', crypto.randomBytes(32).toString('hex'))
+  }
 }
+
+// --- Encryption Utilities ---
+const ALGORITHM = 'aes-256-cbc';
+
+function getEncryptionKey(): Buffer {
+  const hexKey = getSetting('encryption_key');
+  if (!hexKey) throw new Error('Encryption key not found');
+  return Buffer.from(hexKey, 'hex');
+}
+
+export function encrypt(text: string): string {
+  if (!text) return text;
+  try {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(ALGORITHM, getEncryptionKey(), iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return `${iv.toString('hex')}:${encrypted}`;
+  } catch (e) {
+    console.error('Encryption failed', e);
+    return text;
+  }
+}
+
+export function decrypt(text: string): string {
+  if (!text || !text.includes(':')) return text;
+  try {
+    const parts = text.split(':');
+    const iv = Buffer.from(parts[0], 'hex');
+    const encryptedText = parts[1];
+    const decipher = crypto.createDecipheriv(ALGORITHM, getEncryptionKey(), iv);
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (e) {
+    console.error('Decryption failed', e);
+    return text;
+  }
+}
+// ----------------------------
 
 export function getDB() {
   if (!db) {
@@ -51,14 +119,22 @@ export function getDB() {
 export function getConnections() {
   const db = getDB()
   const stmt = db.prepare('SELECT * FROM connections ORDER BY name ASC')
-  return stmt.all()
+  const rows = stmt.all() as any[]
+  
+  // Decrypt passwords
+  return rows.map(r => ({
+    ...r,
+    use_ssh: r.use_ssh === 1,
+    password: decrypt(r.password),
+    ssh_password: decrypt(r.ssh_password)
+  }))
 }
 
 export function saveConnection(connection: any) {
   const db = getDB()
   const stmt = db.prepare(`
-    INSERT INTO connections (id, name, driver, host, port, username, password, database)
-    VALUES (@id, @name, @driver, @host, @port, @username, @password, @database)
+    INSERT INTO connections (id, name, driver, host, port, username, password, database, use_ssh, ssh_host, ssh_port, ssh_username, ssh_password, ssh_keyfile)
+    VALUES (@id, @name, @driver, @host, @port, @username, @password, @database, @use_ssh, @ssh_host, @ssh_port, @ssh_username, @ssh_password, @ssh_keyfile)
     ON CONFLICT(id) DO UPDATE SET
       name = @name,
       driver = @driver,
@@ -67,9 +143,20 @@ export function saveConnection(connection: any) {
       username = @username,
       password = @password,
       database = @database,
+      use_ssh = @use_ssh,
+      ssh_host = @ssh_host,
+      ssh_port = @ssh_port,
+      ssh_username = @ssh_username,
+      ssh_password = @ssh_password,
+      ssh_keyfile = @ssh_keyfile,
       updated_at = CURRENT_TIMESTAMP
   `)
-  return stmt.run(connection)
+  return stmt.run({
+    ...connection,
+    use_ssh: connection.use_ssh ? 1 : 0,
+    password: encrypt(connection.password),
+    ssh_password: encrypt(connection.ssh_password)
+  })
 }
 
 export function deleteConnection(id: string) {
