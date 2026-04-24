@@ -6,7 +6,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 
 ## 🚀 FASE 1: Fundação e Estrutura Base
 
-- [ ] **Passo 1: Setup do Ambiente e Arquitetura Base**
+- [x] **Passo 1: Setup do Ambiente e Arquitetura Base**
     - **Descrição**: Configurar o projeto Electron com React utilizando Vite para alta performance. Estruturar pastas de IPC (Inter-Process Communication).
     - **Requisitos**: `electron`, `vite`, `react`, `typescript`, `tailwindcss` (para UI premium).
     - **Commit**: `feat: initial electron + react + vite setup`
@@ -87,4 +87,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 ---
 
 ## ✅ Resumo do Progresso
-*Nenhum passo concluído ainda.*
+- **Passo 1 concluído**: Estrutura Electron + React (Vite) configurada. TailwindCSS integrado com paleta Dark Premium. Configuração de IPC, Preload e Main Process pronta. Docker Compose para bancos de teste adicionado.
+  - **Commit**: `feat: initial electron + react + vite setup`
