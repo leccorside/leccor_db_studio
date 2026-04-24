@@ -76,7 +76,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 
 ## 📦 FASE 6: Polimento e Distribuição
 
-- [ ] **Passo 11: Gerador de SQL e DDL**
+- [x] **Passo 11: Gerador de SQL e DDL**
     - **Descrição**: Ações de clique direito para gerar "Script AS SELECT", "Create Table", etc.
     - **Commit**: `feat: sql generator and ddl script actions`
 
@@ -107,3 +107,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: visual data editor for inline table updates`
 - **Passo 10 concluído**: Instalado o módulo `ssh2` para suporte a túnel (Port Forwarding). Integrada uma wrapper `createClient` transparente em `postgres.ts` que escuta numa porta randômica local e redireciona os dados para o servidor SSH antes de entregar ao PG. A tabela do SQLite foi alterada para aceitar colunas de túnel SSH. Por fim, implementei criptografia local padrão banco (AES-256-CBC nativo via `crypto` do Node.js) que protege as senhas salvas no SQLite, usando uma chave única gerada randomicamente no ambiente do usuário.
   - **Commit**: `feat: ssh tunneling and credential encryption`
+- **Passo 11 concluído**: Adicionado menu de contexto (botão direito) na listagem das tabelas do Sidebar. Ao clicar, um menu surge permitindo gerar "SELECT Statement" ou "CREATE Statement". Essa requisição sobe para o `App.tsx` e é injetada numa nova aba gerada dinamicamente pelo `EditorArea.tsx` contendo o DDL ou DML pronto daquela tabela de forma fluida.
+  - **Commit**: `feat: sql generator and ddl script actions`

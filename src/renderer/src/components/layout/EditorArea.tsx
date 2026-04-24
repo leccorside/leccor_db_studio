@@ -12,9 +12,10 @@ interface EditorAreaProps {
   onExecute: (sql: string) => void;
   isExecuting: boolean;
   activeConnection: any;
+  externalSqlRequest?: { sql: string, ts: number } | null;
 }
 
-export function EditorArea({ onExecute, isExecuting, activeConnection }: EditorAreaProps) {
+export function EditorArea({ onExecute, isExecuting, activeConnection, externalSqlRequest }: EditorAreaProps) {
   const monaco = useMonaco();
   const [tabs, setTabs] = useState<Tab[]>([
     { id: '1', name: 'query_1.sql', content: 'SELECT * FROM users;' }
@@ -42,6 +43,19 @@ export function EditorArea({ onExecute, isExecuting, activeConnection }: EditorA
       monaco.editor.setTheme('leccor-dark');
     }
   }, [monaco]);
+
+  useEffect(() => {
+    if (externalSqlRequest) {
+      const newId = crypto.randomUUID();
+      const newTab: Tab = {
+        id: newId,
+        name: `Generated_Query.sql`,
+        content: externalSqlRequest.sql
+      };
+      setTabs(prev => [...prev, newTab]);
+      setActiveTabId(newId);
+    }
+  }, [externalSqlRequest]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 

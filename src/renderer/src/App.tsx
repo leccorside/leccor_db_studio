@@ -12,6 +12,7 @@ function App() {
   const [isExecuting, setIsExecuting] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
   const [lastQuerySql, setLastQuerySql] = useState<string>('')
+  const [externalSqlRequest, setExternalSqlRequest] = useState<{ sql: string, ts: number } | null>(null)
 
   const handleExecute = async (sql: string) => {
     if (!activeConnection) {
@@ -50,12 +51,16 @@ function App() {
     setIsExecuting(false)
   }
 
+  const handleGenerateSql = (sql: string) => {
+    setExternalSqlRequest({ sql, ts: Date.now() })
+  }
+
   return (
     <div className="flex h-screen w-screen bg-background overflow-hidden text-white font-sans">
       <ActivityBar onOpenConnections={() => setShowConnections(true)} />
-      <Sidebar activeConnectionId={activeConnection?.id} onConnectionSelect={setActiveConnection} />
+      <Sidebar activeConnectionId={activeConnection?.id} onConnectionSelect={setActiveConnection} onGenerateSql={handleGenerateSql} />
       <div className="flex-1 flex flex-col min-w-0">
-        <EditorArea onExecute={handleExecute} isExecuting={isExecuting} activeConnection={activeConnection} />
+        <EditorArea onExecute={handleExecute} isExecuting={isExecuting} activeConnection={activeConnection} externalSqlRequest={externalSqlRequest} />
         <BottomPanel result={queryResult} error={queryError} activeConnection={activeConnection} lastQuerySql={lastQuerySql} />
       </div>
       
