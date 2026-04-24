@@ -12,7 +12,8 @@ const api = {
   },
   pg: {
     testConnection: (config: any) => ipcRenderer.invoke('pg:testConnection', config),
-    getMetadata: (config: any) => ipcRenderer.invoke('pg:getMetadata', config)
+    getMetadata: (config: any) => ipcRenderer.invoke('pg:getMetadata', config),
+    executeQuery: (config: any, sql: string) => ipcRenderer.invoke('pg:executeQuery', config, sql)
   }
 }
 

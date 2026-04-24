@@ -18,7 +18,12 @@ interface Connection {
   // ...outros campos omitidos por simplicidade
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  activeConnectionId?: string;
+  onConnectionSelect?: (conn: any) => void;
+}
+
+export function Sidebar({ activeConnectionId, onConnectionSelect }: SidebarProps) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>({});
   const [metadataCache, setMetadataCache] = useState<Record<string, Schema[]>>({});
@@ -38,6 +43,8 @@ export function Sidebar() {
   };
 
   const toggleConnection = async (conn: any) => {
+    if (onConnectionSelect) onConnectionSelect(conn);
+    
     const isExpanded = !!expandedConns[conn.id];
     setExpandedConns(prev => ({ ...prev, [conn.id]: !isExpanded }));
 
@@ -75,7 +82,7 @@ export function Sidebar() {
             <div key={conn.id}>
               <div 
                 onClick={() => toggleConnection(conn)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-panel cursor-pointer text-zinc-300"
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-panel cursor-pointer ${activeConnectionId === conn.id ? 'bg-panel text-accent font-medium' : 'text-zinc-300'}`}
               >
                 {expandedConns[conn.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <Server size={14} className="text-accent" />

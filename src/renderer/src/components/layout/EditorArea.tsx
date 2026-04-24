@@ -8,7 +8,13 @@ interface Tab {
   content: string;
 }
 
-export function EditorArea() {
+interface EditorAreaProps {
+  onExecute: (sql: string) => void;
+  isExecuting: boolean;
+  activeConnection: any;
+}
+
+export function EditorArea({ onExecute, isExecuting, activeConnection }: EditorAreaProps) {
   const monaco = useMonaco();
   const [tabs, setTabs] = useState<Tab[]>([
     { id: '1', name: 'query_1.sql', content: 'SELECT * FROM users;' }
@@ -106,9 +112,13 @@ export function EditorArea() {
       </div>
 
       <div className="flex border-b border-border bg-panel/30 p-2 gap-2">
-        <button className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/90 text-white rounded-md text-sm font-medium transition-colors shadow-sm">
-          <Play size={14} fill="currentColor" />
-          Run
+        <button 
+          onClick={() => activeTab && onExecute(activeTab.content)}
+          disabled={!activeTab || isExecuting || !activeConnection}
+          className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors shadow-sm"
+        >
+          {isExecuting ? <Database size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
+          {isExecuting ? 'Running...' : 'Run'}
         </button>
         <button className="flex items-center gap-2 px-3 py-1.5 bg-panel hover:bg-panel/80 text-zinc-300 rounded-md text-sm font-medium transition-colors border border-border shadow-sm">
           <Save size={14} />

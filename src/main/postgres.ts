@@ -66,3 +66,46 @@ export async function getMetadata(config: any) {
     }
   }
 }
+
+export async function executeQuery(config: any, sql: string) {
+  const client = new Client({
+    host: config.host,
+    port: config.port,
+    user: config.username,
+    password: config.password,
+    database: config.database,
+  })
+
+  try {
+    await client.connect()
+    
+    const start = performance.now()
+    const res = await client.query(sql)
+    const end = performance.now()
+
+    // Handling multiple queries vs single query
+    const results = Array.isArray(res) ? res : [res];
+    
+    // We only return the last result for simplicity in this MVP
+    const lastResult = results[results.length - 1];
+
+    return { 
+      success: true, 
+      data: {
+        rows: lastResult.rows,
+        fields: lastResult.fields ? lastResult.fields.map(f => ({ name: f.name, type: f.dataTypeID })) : [],
+        rowCount: lastResult.rowCount,
+        command: lastResult.command,
+        timeMs: Math.round(end - start)
+      }
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  } finally {
+    try {
+      await client.end()
+    } catch (e) {
+      // Ignore errors on close
+    }
+  }
+}

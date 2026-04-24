@@ -44,7 +44,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
     - **Requisitos**: `@monaco-editor/react`, sistema de abas de estado.
     - **Commit**: `feat: sql editor integration with monaco and tabs`
 
-- [ ] **Passo 7: Motor de Execução e Result Grid**
+- [x] **Passo 7: Motor de Execução e Result Grid**
     - **Descrição**: Executar queries SQL no banco e exibir os resultados em uma grade de alta performance.
     - **Requisitos**: IPC bridge para queries, biblioteca de Data Grid (ex: TanStack Table).
     - **Commit**: `feat: query execution engine and result data grid`
@@ -99,3 +99,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: database explorer tree with schemas and tables`
 - **Passo 6 concluído**: Instalado `@monaco-editor/react`. Atualizada a `EditorArea` para suportar múltiplas abas dinâmicas com estado local. Integrado o Monaco Editor com tema dark personalizado (`leccor-dark`), sem minimap e formatado para a melhor experiência na escrita de queries.
   - **Commit**: `feat: sql editor integration with monaco and tabs`
+- **Passo 7 concluído**: Implementado motor de execução de query via Node.js (`pg:executeQuery`). Criado estado global no React (`App.tsx`) ligando a `EditorArea` ao `BottomPanel`. Instalado e configurado `@tanstack/react-table` para renderização dinâmica (com colunas e formatações de tipo detectadas automaticamente) dos resultados, além da aba visual de Messages para falhas de SQL.
+  - **Commit**: `feat: query execution engine and result data grid`
