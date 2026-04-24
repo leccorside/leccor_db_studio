@@ -16,7 +16,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
     - **Requisitos**: Design system básico, componentes de layout responsivos.
     - **Commit**: `feat: main dashboard layout and shell components`
 
-- [ ] **Passo 3: Armazenamento Local (SQLite/LowDB)**
+- [x] **Passo 3: Armazenamento Local (SQLite/LowDB)**
     - **Descrição**: Configurar o banco de dados local para salvar configurações e conexões do usuário.
     - **Requisitos**: SQLite ou store JSON criptografada.
     - **Commit**: `feat: local storage for application settings and connections`
@@ -91,3 +91,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: initial electron + react + vite setup`
 - **Passo 2 concluído**: Layout Shell UI Premium criado com componentes `ActivityBar`, `Sidebar`, `EditorArea` e `BottomPanel`, todos com design moderno, responsivo e baseado no TailwindCSS.
   - **Commit**: `feat: main dashboard layout and shell components`
+- **Passo 3 concluído**: Implementado banco de dados local com `better-sqlite3`. Criada a persistência de "settings" e "connections". Funções IPC expostas no preload e tipadas no TypeScript.
+  - **Commit**: `feat: local storage for application settings and connections`

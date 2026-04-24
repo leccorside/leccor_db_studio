@@ -1,6 +1,7 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting } from './database'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -34,6 +35,16 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Initialize Database
+  initDB()
+
+  // Register IPC Handlers
+  ipcMain.handle('db:getConnections', () => getConnections())
+  ipcMain.handle('db:saveConnection', (_, conn) => saveConnection(conn))
+  ipcMain.handle('db:deleteConnection', (_, id) => deleteConnection(id))
+  ipcMain.handle('db:getSetting', (_, key) => getSetting(key))
+  ipcMain.handle('db:saveSetting', (_, key, value) => saveSetting(key, value))
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.leccor.dbstudio')
 
