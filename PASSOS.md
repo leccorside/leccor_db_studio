@@ -53,7 +53,7 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
 
 ## 🧬 FASE 4: Manipulação de Dados e Histórico
 
-- [ ] **Passo 8: Histórico de Queries e Logs**
+- [x] **Passo 8: Histórico de Queries e Logs**
     - **Descrição**: Salvar todas as queries executadas e exibir logs de tempo e status.
     - **Requisitos**: Persistência de histórico no SQLite local.
     - **Commit**: `feat: query history and execution logs`
@@ -101,3 +101,5 @@ Este documento rastreia o progresso do desenvolvimento do LeccorDBStudio. Cada p
   - **Commit**: `feat: sql editor integration with monaco and tabs`
 - **Passo 7 concluído**: Implementado motor de execução de query via Node.js (`pg:executeQuery`). Criado estado global no React (`App.tsx`) ligando a `EditorArea` ao `BottomPanel`. Instalado e configurado `@tanstack/react-table` para renderização dinâmica (com colunas e formatações de tipo detectadas automaticamente) dos resultados, além da aba visual de Messages para falhas de SQL.
   - **Commit**: `feat: query execution engine and result data grid`
+- **Passo 8 concluído**: Criada a tabela `query_history` no banco local (SQLite) via `database.ts`. Implementada gravação automática do SQL executado, identificando a conexão, status de falha/sucesso e duração em milissegundos. Na aba inferior (BottomPanel), a tab `History` foi ativada para exibir um grid em tempo real do histórico completo das execuções persistidas.
+  - **Commit**: `feat: query history and execution logs`

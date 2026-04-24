@@ -9,6 +9,8 @@ interface Window {
       deleteConnection: (id: string) => Promise<any>;
       getSetting: (key: string) => Promise<string | null>;
       saveSetting: (key: string, value: string) => Promise<any>;
+      saveQueryHistory: (history: any) => Promise<any>;
+      getQueryHistory: () => Promise<any[]>;
     };
     pg: {
       testConnection: (config: any) => Promise<{success: boolean, error?: string}>;

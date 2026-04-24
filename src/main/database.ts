@@ -27,6 +27,17 @@ export function initDB() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS query_history (
+      id TEXT PRIMARY KEY,
+      connection_id TEXT,
+      connection_name TEXT,
+      sql TEXT NOT NULL,
+      execution_time_ms INTEGER,
+      success BOOLEAN,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `)
 }
 
@@ -82,4 +93,33 @@ export function saveSetting(key: string, value: string) {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `)
   return stmt.run(key, value)
+}
+
+export function saveQueryHistory(history: any) {
+  const db = getDB()
+  const stmt = db.prepare(`
+    INSERT INTO query_history (id, connection_id, connection_name, sql, execution_time_ms, success, error_message)
+    VALUES (@id, @connection_id, @connection_name, @sql, @execution_time_ms, @success, @error_message)
+  `)
+  return stmt.run({
+    id: history.id || require('crypto').randomUUID(),
+    connection_id: history.connection_id,
+    connection_name: history.connection_name,
+    sql: history.sql,
+    execution_time_ms: history.execution_time_ms || 0,
+    success: history.success ? 1 : 0,
+    error_message: history.error_message || null
+  })
+}
+
+export function getQueryHistory() {
+  const db = getDB()
+  // Limit to 100 entries for performance
+  const stmt = db.prepare('SELECT * FROM query_history ORDER BY created_at DESC LIMIT 100')
+  const rows = stmt.all() as any[]
+  // Convert boolean
+  return rows.map(r => ({
+    ...r,
+    success: r.success === 1
+  }))
 }

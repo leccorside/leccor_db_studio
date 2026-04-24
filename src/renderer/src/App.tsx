@@ -26,8 +26,23 @@ function App() {
     
     if (result.success) {
       setQueryResult(result.data)
+      window.api.db.saveQueryHistory({
+        connection_id: activeConnection.id,
+        connection_name: activeConnection.name,
+        sql: sql,
+        execution_time_ms: result.data.timeMs,
+        success: true
+      })
     } else {
       setQueryError(result.error || 'Erro desconhecido')
+      window.api.db.saveQueryHistory({
+        connection_id: activeConnection.id,
+        connection_name: activeConnection.name,
+        sql: sql,
+        execution_time_ms: 0,
+        success: false,
+        error_message: result.error || 'Erro desconhecido'
+      })
     }
     
     setIsExecuting(false)

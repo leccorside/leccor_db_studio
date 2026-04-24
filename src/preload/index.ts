@@ -9,6 +9,8 @@ const api = {
     deleteConnection: (id: string) => ipcRenderer.invoke('db:deleteConnection', id),
     getSetting: (key: string) => ipcRenderer.invoke('db:getSetting', key),
     saveSetting: (key: string, value: string) => ipcRenderer.invoke('db:saveSetting', key, value),
+    saveQueryHistory: (history: any) => ipcRenderer.invoke('db:saveQueryHistory', history),
+    getQueryHistory: () => ipcRenderer.invoke('db:getQueryHistory'),
   },
   pg: {
     testConnection: (config: any) => ipcRenderer.invoke('pg:testConnection', config),

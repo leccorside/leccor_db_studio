@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting } from './database'
+import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting, saveQueryHistory, getQueryHistory } from './database'
 import { testConnection, getMetadata, executeQuery } from './postgres'
 
 function createWindow(): void {
@@ -45,6 +45,8 @@ app.whenReady().then(() => {
   ipcMain.handle('db:deleteConnection', (_, id) => deleteConnection(id))
   ipcMain.handle('db:getSetting', (_, key) => getSetting(key))
   ipcMain.handle('db:saveSetting', (_, key, value) => saveSetting(key, value))
+  ipcMain.handle('db:saveQueryHistory', (_, history) => saveQueryHistory(history))
+  ipcMain.handle('db:getQueryHistory', () => getQueryHistory())
   ipcMain.handle('pg:testConnection', (_, config) => testConnection(config))
   ipcMain.handle('pg:getMetadata', (_, config) => getMetadata(config))
   ipcMain.handle('pg:executeQuery', (_, config, sql) => executeQuery(config, sql))

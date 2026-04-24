@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Table, Terminal, History, Maximize2, AlertCircle } from 'lucide-react';
 import { 
   useReactTable, 
@@ -14,7 +14,14 @@ interface BottomPanelProps {
 }
 
 export function BottomPanel({ result, error, activeConnection }: BottomPanelProps) {
-  const [activeTab, setActiveTab] = useState<'grid' | 'messages'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'messages' | 'history'>('grid');
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      window.api.db.getQueryHistory().then(setHistory);
+    }
+  }, [activeTab, result]); // reload history when tab opens or a new result comes in
 
   const columns = useMemo(() => {
     if (!result || !result.fields) return [];
@@ -74,7 +81,10 @@ export function BottomPanel({ result, error, activeConnection }: BottomPanelProp
             {error ? <AlertCircle size={14} /> : <Terminal size={14} />}
             Messages
           </button>
-          <button className="flex items-center gap-2 px-4 h-full text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors">
+          <button 
+            onClick={() => setActiveTab('history')}
+            className={`flex items-center gap-2 px-4 h-full text-sm font-medium transition-colors ${activeTab === 'history' ? 'text-accent border-b-2 border-accent' : 'text-zinc-400 hover:text-zinc-200'}`}
+          >
             <History size={14} />
             History
           </button>
@@ -138,6 +148,47 @@ export function BottomPanel({ result, error, activeConnection }: BottomPanelProp
             ) : (
               <div className="text-zinc-500">No messages.</div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="min-w-full">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="text-xs text-zinc-400 uppercase bg-panel/50 sticky top-0 z-10 shadow-sm backdrop-blur-md">
+                <tr>
+                  <th className="border-r border-b border-border px-4 py-2 font-medium w-32">Data/Hora</th>
+                  <th className="border-r border-b border-border px-4 py-2 font-medium w-32">Status</th>
+                  <th className="border-r border-b border-border px-4 py-2 font-medium">Query</th>
+                  <th className="border-b border-border px-4 py-2 font-medium w-24">Duração</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono text-sm">
+                {history.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-zinc-500">Nenhum histórico encontrado.</td>
+                  </tr>
+                ) : history.map(h => (
+                  <tr key={h.id} className="hover:bg-panel/50 border-b border-border/50 transition-colors">
+                    <td className="border-r border-border px-4 py-2 whitespace-nowrap text-zinc-400">
+                      {new Date(h.created_at + 'Z').toLocaleString()}
+                    </td>
+                    <td className="border-r border-border px-4 py-2 whitespace-nowrap">
+                      {h.success ? (
+                        <span className="text-green-400">Sucesso</span>
+                      ) : (
+                        <span className="text-red-400" title={h.error_message}>Falha</span>
+                      )}
+                    </td>
+                    <td className="border-r border-border px-4 py-2 text-zinc-300 truncate max-w-lg" title={h.sql}>
+                      {h.sql}
+                    </td>
+                    <td className="border-border px-4 py-2 whitespace-nowrap text-zinc-400">
+                      {h.execution_time_ms}ms
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
