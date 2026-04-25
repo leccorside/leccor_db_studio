@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting, saveQueryHistory, getQueryHistory } from './database'
-import { testConnection, getMetadata, executeQuery, cancelQuery } from './postgres'
+import { testConnection, getMetadata, executeQuery, cancelQuery, exportDatabase } from './postgres'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -51,6 +51,7 @@ app.whenReady().then(() => {
   ipcMain.handle('pg:getMetadata', (_, config) => getMetadata(config))
   ipcMain.handle('pg:executeQuery', (_, config, sql) => executeQuery(config, sql))
   ipcMain.handle('pg:cancelQuery', () => cancelQuery())
+  ipcMain.handle('pg:exportDatabase', (_, config, filePath) => exportDatabase(config, filePath))
 
   ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog({
@@ -60,6 +61,12 @@ app.whenReady().then(() => {
       return result.filePaths[0]
     }
     return null
+  })
+
+  ipcMain.handle('dialog:showSaveDialog', async (_, options) => {
+    const result = await dialog.showSaveDialog(options);
+    if (!result.canceled) return result.filePath;
+    return null;
   })
 
   // Set app user model id for windows

@@ -16,10 +16,12 @@ const api = {
     testConnection: (config: any) => ipcRenderer.invoke('pg:testConnection', config),
     getMetadata: (config: any) => ipcRenderer.invoke('pg:getMetadata', config),
     executeQuery: (config: any, sql: string) => ipcRenderer.invoke('pg:executeQuery', config, sql),
-    cancelQuery: () => ipcRenderer.invoke('pg:cancelQuery')
+    cancelQuery: () => ipcRenderer.invoke('pg:cancelQuery'),
+    exportDatabase: (config: any, filePath: string) => ipcRenderer.invoke('pg:exportDatabase', config, filePath)
   },
   dialog: {
-    openFile: () => ipcRenderer.invoke('dialog:openFile')
+    openFile: () => ipcRenderer.invoke('dialog:openFile'),
+    showSaveDialog: (options: any) => ipcRenderer.invoke('dialog:showSaveDialog', options)
   }
 }
 

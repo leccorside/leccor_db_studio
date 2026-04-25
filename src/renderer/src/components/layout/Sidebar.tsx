@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Database, Server, Plus, MoreVertical, Loader2, FileText, Code, CheckCircle2, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Server, Plus, MoreVertical, Loader2, FileText, Code, CheckCircle2, XCircle, Download } from 'lucide-react';
 
 interface SchemaItem {
   name: string;
@@ -309,6 +309,32 @@ ORDER BY ordinal_position;
                 className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
               >
                 Refresh
+              </button>
+              <button 
+                onClick={async () => { 
+                  const conn = connections.find(c => c.id === contextMenu.connId);
+                  if (conn) {
+                    const filePath = await window.api.dialog.showSaveDialog({
+                      title: 'Exportar Banco Completo',
+                      defaultPath: `${conn.database}_export.sql`,
+                      filters: [{ name: 'SQL File', extensions: ['sql'] }]
+                    });
+                    if (filePath) {
+                      setContextMenu(null);
+                      alert('Exportando banco de dados... Isso pode demorar um pouco (estruturas e até 5000 linhas por tabela).');
+                      const res = await window.api.pg.exportDatabase(conn, filePath);
+                      if (res.success) alert('Banco exportado com sucesso para: ' + filePath);
+                      else alert('Erro ao exportar banco: ' + res.error);
+                    } else {
+                      setContextMenu(null);
+                    }
+                  } else {
+                    setContextMenu(null);
+                  }
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors flex items-center gap-2"
+              >
+                <Download size={14} /> Exportar Banco
               </button>
               <div className="border-t border-border/50 my-1"></div>
               <button 

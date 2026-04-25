@@ -275,3 +275,81 @@ export async function cancelQuery() {
   
   return { success: true };
 }
+
+export async function exportDatabase(config: any, filePath: string) {
+  let cleanupFn: (() => void) | null = null;
+  try {
+    const { client, cleanup } = await createClient(config);
+    cleanupFn = cleanup;
+
+    // Get all tables
+    const tablesQuery = `
+      SELECT table_schema, table_name 
+      FROM information_schema.tables 
+      WHERE table_schema NOT IN ('information_schema', 'pg_catalog') AND table_type = 'BASE TABLE'
+    `;
+    const resTables = await client.query(tablesQuery);
+    
+    const ws = fs.createWriteStream(filePath);
+    ws.write(`-- LeccorDBStudio Full Database Export\n`);
+    ws.write(`-- Database: ${config.database}\n`);
+    ws.write(`-- Date: ${new Date().toISOString()}\n\n`);
+
+    for (const row of resTables.rows) {
+      const schema = row.table_schema;
+      const table = row.table_name;
+      
+      const colsQuery = `
+        SELECT column_name, data_type, character_maximum_length, is_nullable
+        FROM information_schema.columns 
+        WHERE table_schema = $1 AND table_name = $2
+        ORDER BY ordinal_position
+      `;
+      const resCols = await client.query(colsQuery, [schema, table]);
+      
+      const columns = resCols.rows.map((r: any) => {
+        let type = r.data_type;
+        if (r.character_maximum_length) type += `(${r.character_maximum_length})`;
+        const nullable = r.is_nullable === 'YES' ? 'NULL' : 'NOT NULL';
+        return `  "${r.column_name}" ${type} ${nullable}`;
+      });
+      
+      ws.write(`CREATE TABLE "${schema}"."${table}" (\n${columns.join(',\n')}\n);\n\n`);
+      
+      try {
+        const dataQuery = `SELECT * FROM "${schema}"."${table}" LIMIT 5000`; // Limit 5000 for MVP
+        const resData = await client.query(dataQuery);
+        
+        if (resData.rows.length > 0) {
+          const fields = resData.fields.map(f => `"${f.name}"`);
+          
+          for (const d of resData.rows) {
+            const values = resData.fields.map(f => {
+              const val = d[f.name];
+              if (val === null || val === undefined) return 'NULL';
+              if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+              if (val instanceof Date) return `'${val.toISOString()}'`;
+              if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+              return val;
+            });
+            ws.write(`INSERT INTO "${schema}"."${table}" (${fields.join(', ')}) VALUES (${values.join(', ')});\n`);
+          }
+          ws.write('\n');
+        }
+      } catch (e: any) {
+        ws.write(`-- Error exporting data for ${table}: ${e.message}\n\n`);
+      }
+    }
+    
+    ws.end();
+    
+    return new Promise((resolve) => {
+      ws.on('finish', () => resolve({ success: true }));
+      ws.on('error', (err) => resolve({ success: false, error: err.message }));
+    });
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  } finally {
+    if (cleanupFn) cleanupFn();
+  }
+}
