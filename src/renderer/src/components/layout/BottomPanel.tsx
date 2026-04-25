@@ -7,6 +7,19 @@ import {
   createColumnHelper 
 } from '@tanstack/react-table';
 
+const formatSqlValue = (val: any): string => {
+  if (val === null || val === undefined || val === '') return 'NULL';
+  if (val instanceof Date) {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `'${val.getFullYear()}-${pad(val.getMonth() + 1)}-${pad(val.getDate())} ${pad(val.getHours())}:${pad(val.getMinutes())}:${pad(val.getSeconds())}'`;
+  }
+  if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+  if (typeof val === 'number') return val.toString();
+  if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+  
+  return `'${String(val).replace(/'/g, "''")}'`;
+};
+
 interface BottomPanelProps {
   result: any;
   error: string | null;
@@ -180,12 +193,13 @@ export function BottomPanel({ result, error, activeConnection, lastQuerySql, onR
         const idValue = rowData[idField.name];
 
         const setStatements = Object.entries(rowEdits).map(([col, val]) => {
-          const formattedVal = isNaN(Number(val)) || val === '' ? `'${val}'` : val; 
-          return `${col} = ${formattedVal}`;
+          return `${col} = ${formatSqlValue(val)}`;
         }).join(', ');
 
-        const updateSql = `UPDATE ${tableName} SET ${setStatements} WHERE ${idField.name} = ${isNaN(Number(idValue)) ? `'${idValue}'` : idValue};`;
-        await window.api.pg.executeQuery(activeConnection, updateSql);
+        const updateSql = `UPDATE ${tableName} SET ${setStatements} WHERE ${idField.name} = ${formatSqlValue(idValue)};`;
+        const api = activeConnection.driver === 'mysql' ? window.api.mysql : window.api.pg;
+        const res = await api.executeQuery(activeConnection, updateSql);
+        if (!res.success) throw new Error(res.error || 'Failed to update row');
       }
 
       // Handle INSERTS
@@ -201,12 +215,14 @@ export function BottomPanel({ result, error, activeConnection, lastQuerySql, onR
           let val = finalData[f.name];
           if (val !== null && val !== undefined && val !== '') {
             cols.push(f.name);
-            vals.push(isNaN(Number(val)) ? `'${val}'` : val);
+            vals.push(formatSqlValue(val));
           }
         }
         if (cols.length > 0) {
           const insertSql = `INSERT INTO ${tableName} (${cols.join(', ')}) VALUES (${vals.join(', ')});`;
-          await window.api.pg.executeQuery(activeConnection, insertSql);
+          const api = activeConnection.driver === 'mysql' ? window.api.mysql : window.api.pg;
+          const res = await api.executeQuery(activeConnection, insertSql);
+          if (!res.success) throw new Error(res.error || 'Failed to insert row');
         }
       }
 
@@ -216,18 +232,21 @@ export function BottomPanel({ result, error, activeConnection, lastQuerySql, onR
         const rowData = localRows[rowIdx];
         const idValue = rowData[idField.name];
         if (idValue !== null && idValue !== undefined) {
-          const deleteSql = `DELETE FROM ${tableName} WHERE ${idField.name} = ${isNaN(Number(idValue)) ? `'${idValue}'` : idValue};`;
-          await window.api.pg.executeQuery(activeConnection, deleteSql);
+          const deleteSql = `DELETE FROM ${tableName} WHERE ${idField.name} = ${formatSqlValue(idValue)};`;
+          const api = activeConnection.driver === 'mysql' ? window.api.mysql : window.api.pg;
+          const res = await api.executeQuery(activeConnection, deleteSql);
+          if (!res.success) throw new Error(res.error || 'Failed to delete row');
         }
       }
       
       setEditedCells({});
       setAddedRows(new Set());
       setDeletedRows(new Set());
-      // Idealy we would refresh the query here, but for MVP we just clear the orange highlights
-      // To properly refresh we'd need App.tsx to pass a refresh function. 
-      // We will leave the edited values in local state or show a success message.
-      alert('Alterações salvas com sucesso! Execute a query novamente para atualizar a tabela.');
+      
+      alert('Alterações salvas com sucesso!');
+      if (onRefresh) {
+        onRefresh();
+      }
       
     } catch (e: any) {
       alert('Erro ao salvar: ' + e.message);
@@ -308,9 +327,12 @@ export function BottomPanel({ result, error, activeConnection, lastQuerySql, onR
     setCalculatingCount(true);
     try {
       const countSql = `SELECT count(*) as total FROM ${tableName};`;
-      const res = await window.api.pg.executeQuery(activeConnection, countSql);
-      if (res && res.rows && res.rows[0]) {
-        alert(`Total rows in ${tableName}: ${res.rows[0].total}`);
+      const api = activeConnection.driver === 'mysql' ? window.api.mysql : window.api.pg;
+      const res = await api.executeQuery(activeConnection, countSql);
+      if (!res.success) throw new Error(res.error || 'Failed to count rows');
+      
+      if (res.data && res.data.rows && res.data.rows[0]) {
+        alert(`Total rows in ${tableName}: ${res.data.rows[0].total}`);
       }
     } catch (e: any) {
       alert('Error calculating count: ' + e.message);
@@ -352,6 +374,12 @@ export function BottomPanel({ result, error, activeConnection, lastQuerySql, onR
   const handleDuplicateRow = () => {
     if (selectedRowIdx === null) return;
     const newRow = { ...localRows[selectedRowIdx] };
+    
+    // Clear the primary key (assuming 'id' or first column) so DB auto-increments
+    const idField = result.fields.find((f: any) => f.name.toLowerCase() === 'id') || result.fields[0];
+    if (idField) {
+      newRow[idField.name] = null;
+    }
     
     setLocalRows(prev => {
       const next = [...prev, newRow];
@@ -716,15 +744,16 @@ export function BottomPanel({ result, error, activeConnection, lastQuerySql, onR
                   const idValue = originalData[idField.name];
 
                   const setStatements = Object.entries(updates).map(([col, val]) => {
-                    const formattedVal = val === null ? 'NULL' : (isNaN(Number(val)) || val === '' ? `'${val}'` : val); 
-                    return `${col} = ${formattedVal}`;
+                    return `${col} = ${formatSqlValue(val)}`;
                   }).join(', ');
 
-                  const updateSql = `UPDATE ${tableName} SET ${setStatements} WHERE ${idField.name} = ${isNaN(Number(idValue)) ? `'${idValue}'` : idValue};`;
+                  const updateSql = `UPDATE ${tableName} SET ${setStatements} WHERE ${idField.name} = ${formatSqlValue(idValue)};`;
                   
                   setIsModalSaving(true);
                   try {
-                    await window.api.pg.executeQuery(activeConnection, updateSql);
+                    const api = activeConnection.driver === 'mysql' ? window.api.mysql : window.api.pg;
+                    const res = await api.executeQuery(activeConnection, updateSql);
+                    if (!res.success) throw new Error(res.error || 'Failed to update row');
                     if (onRefresh) onRefresh();
                   } catch (e: any) {
                     alert('Erro ao salvar edição: ' + e.message);

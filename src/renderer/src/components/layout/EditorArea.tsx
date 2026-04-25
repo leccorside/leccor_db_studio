@@ -86,22 +86,38 @@ export function EditorArea({ onExecute, isExecuting, activeConnection, externalS
     }
   }, [activeConnection]);
 
-  // Load saved tabs on mount
+  // Load saved tabs when connection changes
   useEffect(() => {
-    window.api.db.getSetting('workspace_tabs').then(saved => {
+    if (!activeConnection) {
+      const newId = crypto.randomUUID();
+      setTabs([{ id: newId, name: 'query_1.sql', content: '' }]);
+      setActiveTabId(newId);
+      return;
+    }
+
+    const settingKey = `workspace_tabs_${activeConnection.id}`;
+    window.api.db.getSetting(settingKey).then(saved => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.tabs && parsed.tabs.length > 0) {
             setTabs(parsed.tabs);
             setActiveTabId(parsed.activeTabId || parsed.tabs[0].id);
+          } else {
+            const newId = crypto.randomUUID();
+            setTabs([{ id: newId, name: 'query_1.sql', content: '' }]);
+            setActiveTabId(newId);
           }
         } catch (e) {
           console.error("Failed to parse saved tabs", e);
         }
+      } else {
+        const newId = crypto.randomUUID();
+        setTabs([{ id: newId, name: 'query_1.sql', content: '' }]);
+        setActiveTabId(newId);
       }
     });
-  }, []);
+  }, [activeConnection?.id]);
 
   useEffect(() => {
     if (externalSqlRequest) {
@@ -148,7 +164,7 @@ export function EditorArea({ onExecute, isExecuting, activeConnection, externalS
 
   const handleEditorChange = (value: string | undefined) => {
     if (value === undefined || !activeTabId) return;
-    setTabs(tabs.map(t => t.id === activeTabId ? { ...t, content: value } : t));
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, content: value } : t));
   };
 
   const checkAutocomplete = () => {
@@ -266,8 +282,10 @@ export function EditorArea({ onExecute, isExecuting, activeConnection, externalS
   };
 
   const handleSave = async () => {
+    if (!activeConnection) return;
     try {
-      await window.api.db.saveSetting('workspace_tabs', JSON.stringify({ tabs, activeTabId }));
+      const settingKey = `workspace_tabs_${activeConnection.id}`;
+      await window.api.db.saveSetting(settingKey, JSON.stringify({ tabs, activeTabId }));
       setIsSavedStatus(true);
       setTimeout(() => setIsSavedStatus(false), 2000);
     } catch (e) {
