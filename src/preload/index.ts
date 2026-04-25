@@ -17,7 +17,16 @@ const api = {
     getMetadata: (config: any) => ipcRenderer.invoke('pg:getMetadata', config),
     executeQuery: (config: any, sql: string) => ipcRenderer.invoke('pg:executeQuery', config, sql),
     cancelQuery: () => ipcRenderer.invoke('pg:cancelQuery'),
-    exportDatabase: (config: any, filePath: string) => ipcRenderer.invoke('pg:exportDatabase', config, filePath)
+    exportDatabase: (config: any, filePath: string) => ipcRenderer.invoke('pg:exportDatabase', config, filePath),
+    importDatabase: (config: any, filePath: string) => ipcRenderer.invoke('pg:importDatabase', config, filePath)
+  },
+  mysql: {
+    testConnection: (config: any) => ipcRenderer.invoke('mysql:testConnection', config),
+    getMetadata: (config: any) => ipcRenderer.invoke('mysql:getMetadata', config),
+    executeQuery: (config: any, sql: string) => ipcRenderer.invoke('mysql:executeQuery', config, sql),
+    cancelQuery: () => ipcRenderer.invoke('mysql:cancelQuery'),
+    exportDatabase: (config: any, filePath: string) => ipcRenderer.invoke('mysql:exportDatabase', config, filePath),
+    importDatabase: (config: any, filePath: string) => ipcRenderer.invoke('mysql:importDatabase', config, filePath)
   },
   dialog: {
     openFile: () => ipcRenderer.invoke('dialog:openFile'),

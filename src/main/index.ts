@@ -2,7 +2,8 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDB, getConnections, saveConnection, deleteConnection, getSetting, saveSetting, saveQueryHistory, getQueryHistory } from './database'
-import { testConnection, getMetadata, executeQuery, cancelQuery, exportDatabase } from './postgres'
+import { testConnection, getMetadata, executeQuery, cancelQuery, exportDatabase, importDatabase } from './postgres'
+import * as mysqlHandlers from './mysql'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -52,6 +53,14 @@ app.whenReady().then(() => {
   ipcMain.handle('pg:executeQuery', (_, config, sql) => executeQuery(config, sql))
   ipcMain.handle('pg:cancelQuery', () => cancelQuery())
   ipcMain.handle('pg:exportDatabase', (_, config, filePath) => exportDatabase(config, filePath))
+  ipcMain.handle('pg:importDatabase', (_, config, filePath) => importDatabase(config, filePath))
+
+  ipcMain.handle('mysql:testConnection', (_, config) => mysqlHandlers.testConnection(config))
+  ipcMain.handle('mysql:getMetadata', (_, config) => mysqlHandlers.getMetadata(config))
+  ipcMain.handle('mysql:executeQuery', (_, config, sql) => mysqlHandlers.executeQuery(config, sql))
+  ipcMain.handle('mysql:cancelQuery', () => mysqlHandlers.cancelQuery())
+  ipcMain.handle('mysql:exportDatabase', (_, config, filePath) => mysqlHandlers.exportDatabase(config, filePath))
+  ipcMain.handle('mysql:importDatabase', (_, config, filePath) => mysqlHandlers.importDatabase(config, filePath))
 
   ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog({

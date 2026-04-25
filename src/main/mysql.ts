@@ -1,17 +1,14 @@
-import { Client } from 'pg'
+import mysql from 'mysql2/promise'
 import { Client as SSHClient } from 'ssh2'
 import fs from 'fs'
 import net from 'net'
-import dns from 'dns'
-import util from 'util'
 import crypto from 'crypto'
 import { EventEmitter } from 'events'
 import { getQueryHistoryByConnection, saveConnection, saveQueryHistory } from './database'
 
-const lookup = util.promisify(dns.lookup)
 const executionEvents = new EventEmitter()
 
-async function createClient(config: any): Promise<{ client: Client, cleanup: () => void }> {
+async function createClient(config: any): Promise<{ client: mysql.Connection, cleanup: () => void }> {
   if (config.use_ssh) {
     return new Promise((resolve, reject) => {
       const ssh = new SSHClient();
@@ -19,16 +16,13 @@ async function createClient(config: any): Promise<{ client: Client, cleanup: () 
       
       ssh.on('ready', async () => {
         const targetHostRaw = (config.host || '127.0.0.1').trim();
-        const targetPort = config.port || 5432;
-        
-        let resolvedHost = targetHostRaw;
+        const targetPort = config.port || 3306;
 
-        // Create a local TCP server that forwards traffic through the SSH tunnel
         localServer = net.createServer((sock) => {
           ssh.forwardOut(
             sock.remoteAddress || '127.0.0.1', 
             sock.remotePort || 0, 
-            resolvedHost,
+            targetHostRaw,
             targetPort,
             (err, stream) => {
               if (err) {
@@ -43,42 +37,34 @@ async function createClient(config: any): Promise<{ client: Client, cleanup: () 
           );
         });
 
-        localServer.listen(0, '127.0.0.1', () => {
+        localServer.listen(0, '127.0.0.1', async () => {
           const localPort = (localServer?.address() as net.AddressInfo).port;
           
-          const pgConfig: any = {
+          const mysqlConfig: mysql.ConnectionOptions = {
             host: '127.0.0.1',
             port: localPort,
             user: config.username,
             password: config.password,
-            database: config.database,
-            connectionTimeoutMillis: 15000,
-            query_timeout: 30000,
-            statement_timeout: 30000
+            database: config.database || undefined,
+            connectTimeout: 15000,
+            multipleStatements: true
           };
           
-          // Use SSL for remote hosts, RDS requires this.
-          if (config.host && !['localhost', '127.0.0.1'].includes(config.host.trim())) {
-            pgConfig.ssl = { rejectUnauthorized: false };
-          }
-          
-          const pgClient = new Client(pgConfig);
-
-          pgClient.connect(err => {
-            if (err) {
-              try { localServer?.close(); } catch (e) {}
-              try { ssh.end(); } catch (e) {}
-              return reject(err);
-            }
+          try {
+            const mysqlClient = await mysql.createConnection(mysqlConfig);
             resolve({
-              client: pgClient,
+              client: mysqlClient,
               cleanup: () => {
-                try { pgClient.end(); } catch (e) {}
+                try { mysqlClient.end(); } catch (e) {}
                 try { localServer?.close(); } catch (e) {}
                 try { ssh.end(); } catch (e) {}
               }
             });
-          });
+          } catch (err) {
+            try { localServer?.close(); } catch (e) {}
+            try { ssh.end(); } catch (e) {}
+            reject(err);
+          }
         });
       }).on('error', (err) => {
         reject(err);
@@ -99,23 +85,17 @@ async function createClient(config: any): Promise<{ client: Client, cleanup: () 
       ssh.connect(sshConfig);
     });
   } else {
-    const pgConfig: any = {
+    const mysqlConfig: mysql.ConnectionOptions = {
       host: config.host,
-      port: config.port,
+      port: config.port || 3306,
       user: config.username,
       password: config.password,
-      database: config.database,
-      connectionTimeoutMillis: 15000,
-      query_timeout: 30000,
-      statement_timeout: 30000
+      database: config.database || undefined,
+      connectTimeout: 15000,
+      multipleStatements: true
     };
 
-    if (config.host && !['localhost', '127.0.0.1'].includes(config.host.trim())) {
-      pgConfig.ssl = { rejectUnauthorized: false };
-    }
-
-    const client = new Client(pgConfig);
-    await client.connect();
+    const client = await mysql.createConnection(mysqlConfig);
     return {
       client,
       cleanup: () => {
@@ -146,16 +126,16 @@ export async function getMetadata(config: any) {
     cleanupFn = cleanup;
 
     const query = `
-      SELECT table_schema as schema, table_name as name, table_type as type 
+      SELECT TABLE_SCHEMA as \`schema\`, TABLE_NAME as name, TABLE_TYPE as type 
       FROM information_schema.tables 
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog') 
-      ORDER BY table_schema, table_name;
+      WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      ORDER BY TABLE_SCHEMA, TABLE_NAME;
     `
-    const res = await client.query(query)
+    const [rows] = await client.query(query)
     
     // Group by schema
     const schemas: Record<string, any[]> = {}
-    res.rows.forEach(row => {
+    ;(rows as any[]).forEach(row => {
       if (!schemas[row.schema]) schemas[row.schema] = []
       schemas[row.schema].push({ name: row.name, type: row.type })
     })
@@ -173,7 +153,7 @@ export async function getMetadata(config: any) {
   }
 }
 
-let activeQueryClient: { client: Client, cleanup: () => void, config: any } | null = null;
+let activeQueryClient: { client: mysql.Connection, cleanup: () => void, config: any } | null = null;
 let currentExecutionId: string | null = null;
 
 export async function executeQuery(config: any, sql: string) {
@@ -205,11 +185,14 @@ export async function executeQuery(config: any, sql: string) {
     });
 
     let res: any;
+    let fields: any;
     try {
-      res = await Promise.race([
+      const result = await Promise.race([
         client.query(sql),
         cancelPromise
       ]);
+      res = result[0];
+      fields = result[1];
     } finally {
       if (cancelListener) {
         executionEvents.removeListener('cancel', cancelListener);
@@ -218,19 +201,24 @@ export async function executeQuery(config: any, sql: string) {
     
     const end = performance.now()
 
-    // Handling multiple queries vs single query
-    const results = Array.isArray(res) ? res : [res];
-    
-    // We only return the last result for simplicity in this MVP
+    // Handing multiple statements (if returned array of arrays)
+    const results = Array.isArray(res) && Array.isArray(res[0]) ? res : [res];
     const lastResult = results[results.length - 1];
+    
+    // Also need fields for the last result
+    const lastFields = Array.isArray(fields) && Array.isArray(fields[0]) ? fields[fields.length - 1] : fields;
+
+    // Formatting result similarly to Postgres
+    const rowCount = Array.isArray(lastResult) ? lastResult.length : (lastResult?.affectedRows || 0);
+    const command = Array.isArray(lastResult) ? 'SELECT' : 'UPDATE/INSERT/DELETE';
 
     return { 
       success: true, 
       data: {
-        rows: lastResult.rows,
-        fields: lastResult.fields ? lastResult.fields.map(f => ({ name: f.name, type: f.dataTypeID })) : [],
-        rowCount: lastResult.rowCount,
-        command: lastResult.command,
+        rows: Array.isArray(lastResult) ? lastResult : [],
+        fields: lastFields ? lastFields.map((f: any) => ({ name: f.name, type: f.columnType })) : [],
+        rowCount: rowCount,
+        command: command,
         timeMs: Math.round(end - start)
       }
     }
@@ -247,27 +235,28 @@ export async function executeQuery(config: any, sql: string) {
 
 export async function cancelQuery() {
   const execId = currentExecutionId;
-  currentExecutionId = null; // Instantly abort any connection phase
+  currentExecutionId = null;
 
   if (execId) {
     executionEvents.emit('cancel', execId);
   }
 
   if (activeQueryClient) {
-    const { client, config, cleanup } = activeQueryClient;
-    const processID = client.processID;
+    const { client, cleanup } = activeQueryClient;
+    const threadId = (client as any).threadId;
 
-    if (processID) {
-      createClient(config).then(cancelConn => {
-        cancelConn.client.query('SELECT pg_cancel_backend($1)', [processID])
-          .finally(() => cancelConn.cleanup());
-      }).catch(e => console.error('Cancel request failed', e));
+    if (threadId) {
+      try {
+        const cancelConn = await createClient(activeQueryClient.config);
+        await cancelConn.client.query(`KILL QUERY ${threadId}`);
+        cancelConn.cleanup();
+      } catch (e) {
+        console.error('Cancel request failed', e);
+      }
     }
 
     try {
-      if ((client as any).connection && (client as any).connection.stream) {
-        (client as any).connection.stream.destroy();
-      }
+      client.destroy();
       cleanup();
     } catch (e) {
       console.error('Error destroying socket:', e);
@@ -286,60 +275,43 @@ export async function exportDatabase(config: any, filePath: string) {
     cleanupFn = cleanup;
 
     const history = getQueryHistoryByConnection(config.id);
+    const dbName = config.database;
+    if (!dbName) throw new Error("Database not specified for export.");
 
-    const tablesQuery = `
-      SELECT table_schema, table_name 
-      FROM information_schema.tables 
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog') AND table_type = 'BASE TABLE'
-    `;
-    const resTables = await client.query(tablesQuery);
-    
     const ws = fs.createWriteStream(filePath);
     ws.write(`/* LECCOR_DB_STUDIO_EXPORT_V1\n`);
     ws.write(JSON.stringify({ connection: config, history: history }, null, 2));
     ws.write(`\n*/\n\n`);
     ws.write(`-- LeccorDBStudio Full Database Export\n`);
-    ws.write(`-- Database: ${config.database}\n`);
+    ws.write(`-- Database: ${dbName}\n`);
     ws.write(`-- Date: ${new Date().toISOString()}\n\n`);
+    
+    ws.write(`SET FOREIGN_KEY_CHECKS=0;\n\n`);
 
-    for (const row of resTables.rows) {
-      const schema = row.table_schema;
-      const table = row.table_name;
+    const [tablesRow]: any = await client.query(`SHOW TABLES`);
+    
+    for (const row of tablesRow) {
+      const table = Object.values(row)[0] as string;
       
-      const colsQuery = `
-        SELECT column_name, data_type, character_maximum_length, is_nullable
-        FROM information_schema.columns 
-        WHERE table_schema = $1 AND table_name = $2
-        ORDER BY ordinal_position
-      `;
-      const resCols = await client.query(colsQuery, [schema, table]);
-      
-      const columns = resCols.rows.map((r: any) => {
-        let type = r.data_type;
-        if (r.character_maximum_length) type += `(${r.character_maximum_length})`;
-        const nullable = r.is_nullable === 'YES' ? 'NULL' : 'NOT NULL';
-        return `  "${r.column_name}" ${type} ${nullable}`;
-      });
-      
-      ws.write(`CREATE TABLE IF NOT EXISTS "${schema}"."${table}" (\n${columns.join(',\n')}\n);\n\n`);
+      const [createTableResult]: any = await client.query(`SHOW CREATE TABLE \`${table}\``);
+      ws.write(createTableResult[0]['Create Table'] + ';\n\n');
       
       try {
-        const dataQuery = `SELECT * FROM "${schema}"."${table}" LIMIT 5000`; // Limit 5000 for MVP
-        const resData = await client.query(dataQuery);
+        const [resData, fields]: any = await client.query(`SELECT * FROM \`${table}\` LIMIT 5000`);
         
-        if (resData.rows.length > 0) {
-          const fields = resData.fields.map(f => `"${f.name}"`);
+        if (resData.length > 0) {
+          const fieldNames = fields.map((f: any) => `\`${f.name}\``);
           
-          for (const d of resData.rows) {
-            const values = resData.fields.map(f => {
+          for (const d of resData) {
+            const values = fields.map((f: any) => {
               const val = d[f.name];
               if (val === null || val === undefined) return 'NULL';
               if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
-              if (val instanceof Date) return `'${val.toISOString()}'`;
+              if (val instanceof Date) return `'${val.toISOString().slice(0, 19).replace('T', ' ')}'`;
               if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
               return val;
             });
-            ws.write(`INSERT INTO "${schema}"."${table}" (${fields.join(', ')}) VALUES (${values.join(', ')});\n`);
+            ws.write(`INSERT INTO \`${table}\` (${fieldNames.join(', ')}) VALUES (${values.join(', ')});\n`);
           }
           ws.write('\n');
         }
@@ -348,6 +320,7 @@ export async function exportDatabase(config: any, filePath: string) {
       }
     }
     
+    ws.write(`SET FOREIGN_KEY_CHECKS=1;\n`);
     ws.end();
     
     return new Promise((resolve) => {
@@ -366,7 +339,6 @@ export async function importDatabase(config: any, filePath: string) {
   try {
     let sql = fs.readFileSync(filePath, 'utf-8');
     
-    // Parse metadata
     let importConfig = config;
     if (sql.startsWith('/* LECCOR_DB_STUDIO_EXPORT_V1')) {
       const endMarker = '*/';
@@ -382,11 +354,9 @@ export async function importDatabase(config: any, filePath: string) {
               id: newConnId,
               name: metadata.connection.name + ' (Importado)'
             };
-            // Restore connection as a new one to avoid conflicts
             saveConnection(importConfig);
           }
           if (metadata.history && Array.isArray(metadata.history)) {
-            // Restore history with new IDs pointing to the new connection
             for (const item of metadata.history) {
               saveQueryHistory({
                 ...item,

@@ -79,7 +79,8 @@ export function ConnectionManager({ onClose, initialSelectedId }: { onClose: () 
   const handleTest = async () => {
     setTestStatus('testing')
     setTestMessage('')
-    const result = await window.api.pg.testConnection(formData)
+    const apiGroup = formData.driver === 'mysql' ? window.api.mysql : window.api.pg;
+    const result = await apiGroup.testConnection(formData)
     if (result.success) {
       setTestStatus('success')
       setTestMessage('Conexão bem sucedida!')
@@ -155,7 +156,7 @@ export function ConnectionManager({ onClose, initialSelectedId }: { onClose: () 
                   onChange={e => setFormData({...formData, driver: e.target.value})}
                 >
                   <option value="postgres">PostgreSQL</option>
-                  <option value="mysql" disabled>MySQL (Em breve)</option>
+                  <option value="mysql">MySQL</option>
                   <option value="sqlite" disabled>SQLite (Em breve)</option>
                 </select>
               </div>

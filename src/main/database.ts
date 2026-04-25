@@ -220,3 +220,13 @@ export function getQueryHistory() {
     success: r.success === 1
   }))
 }
+
+export function getQueryHistoryByConnection(connectionId: string) {
+  const db = getDB()
+  const stmt = db.prepare('SELECT * FROM query_history WHERE connection_id = ? ORDER BY created_at DESC')
+  const rows = stmt.all(connectionId) as any[]
+  return rows.map(r => ({
+    ...r,
+    success: r.success === 1
+  }))
+}

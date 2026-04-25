@@ -14,6 +14,7 @@ function App() {
   const [lastQuerySql, setLastQuerySql] = useState<string>('')
   const [externalSqlRequest, setExternalSqlRequest] = useState<{ sql: string, ts: number } | null>(null)
   const [editingConnId, setEditingConnId] = useState<string | undefined>()
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0)
 
   const handleExecute = async (sql: string) => {
     if (!activeConnection) {
@@ -26,7 +27,8 @@ function App() {
     setQueryResult(null)
     setLastQuerySql(sql)
 
-    const result = await window.api.pg.executeQuery(activeConnection, sql)
+    const apiGroup = activeConnection.driver === 'mysql' ? window.api.mysql : window.api.pg;
+    const result = await apiGroup.executeQuery(activeConnection, sql)
     
     if (result.success) {
       setQueryResult(result.data)
@@ -69,6 +71,7 @@ function App() {
         onConnectionSelect={setActiveConnection} 
         onGenerateSql={handleGenerateSql} 
         onEditConnection={handleEditConnection}
+        refreshTrigger={sidebarRefreshTrigger}
       />
       <div className="flex-1 flex flex-col min-w-0">
         <EditorArea onExecute={handleExecute} isExecuting={isExecuting} activeConnection={activeConnection} externalSqlRequest={externalSqlRequest} />
@@ -77,7 +80,7 @@ function App() {
       
       {showConnections && (
         <ConnectionManager 
-          onClose={() => {setShowConnections(false); setEditingConnId(undefined)}} 
+          onClose={() => {setShowConnections(false); setEditingConnId(undefined); setSidebarRefreshTrigger(prev => prev + 1)}} 
           initialSelectedId={editingConnId} 
         />
       )}

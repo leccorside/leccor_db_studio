@@ -23,9 +23,10 @@ interface SidebarProps {
   onConnectionSelect?: (conn: any) => void;
   onGenerateSql?: (sql: string) => void;
   onEditConnection?: (connId: string) => void;
+  refreshTrigger?: number;
 }
 
-export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql, onEditConnection }: SidebarProps) {
+export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql, onEditConnection, refreshTrigger }: SidebarProps) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>({});
   const [metadataCache, setMetadataCache] = useState<Record<string, Schema[]>>({});
@@ -37,7 +38,7 @@ export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql,
     visible: boolean;
     x: number;
     y: number;
-    type: 'table' | 'connection';
+    type: 'table' | 'connection' | 'explorer';
     connId: string;
     schema?: string;
     table?: string;
@@ -50,6 +51,12 @@ export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql,
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      loadConnections();
+    }
+  }, [refreshTrigger]);
 
   const loadConnections = async () => {
     const data = await window.api.db.getConnections();
@@ -66,11 +73,14 @@ export function Sidebar({ activeConnectionId, onConnectionSelect, onGenerateSql,
 
     if ((!isExpanded || forceRefresh) && (!metadataCache[conn.id] || forceRefresh)) {
       setLoadingMetadata(prev => ({ ...prev, [conn.id]: true }));
-      const result = await window.api.pg.getMetadata(conn);
+      const apiGroup = conn.driver === 'mysql' ? window.api.mysql : window.api.pg;
+      const result = await apiGroup.getMetadata(conn);
       if (result.success && result.data) {
         setMetadataCache(prev => ({ ...prev, [conn.id]: result.data! }));
       } else {
         console.error('Error fetching metadata', result.error);
+        alert(`Erro ao conectar: ${result.error}`);
+        setExpandedConns(prev => ({ ...prev, [conn.id]: false }));
       }
       setLoadingMetadata(prev => ({ ...prev, [conn.id]: false }));
     }
@@ -126,7 +136,8 @@ ORDER BY ordinal_position;
     `;
     
     try {
-      const res = await window.api.pg.executeQuery(conn, sql);
+      const apiGroup = conn.driver === 'mysql' ? window.api.mysql : window.api.pg;
+      const res = await apiGroup.executeQuery(conn, sql);
       if (res.success && res.data.rows) {
         const columns = res.data.rows.map((row: any) => {
           let type = row.data_type;
@@ -148,7 +159,20 @@ ORDER BY ordinal_position;
       <div className="h-12 border-b border-border flex items-center justify-between px-4">
         <span className="font-semibold text-sm uppercase tracking-wider text-zinc-300">Explorer</span>
         <div className="flex gap-2">
-          <button onClick={loadConnections} className="text-zinc-400 hover:text-white transition-colors" title="Reload">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setContextMenu({
+                visible: true,
+                x: Math.min(e.pageX, window.innerWidth - 180),
+                y: e.pageY + 10,
+                type: 'explorer',
+                connId: activeConnectionId || ''
+              });
+            }}
+            className="text-zinc-400 hover:text-white transition-colors" 
+            title="Opções"
+          >
             <MoreVertical size={16} />
           </button>
         </div>
@@ -239,7 +263,48 @@ ORDER BY ordinal_position;
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
-          {contextMenu.type === 'table' ? (
+          {contextMenu.type === 'explorer' ? (
+            <>
+              <button 
+                onClick={() => { 
+                  loadConnections();
+                  setContextMenu(null); 
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
+              >
+                Reload Connections
+              </button>
+              <button 
+                onClick={async () => {
+                  setContextMenu(null);
+                  
+                  if (!window.api.dialog.openFile || !window.api.pg.importDatabase) {
+                    alert('Por favor, recarregue o aplicativo (Ctrl+R) para carregar as novas funções.');
+                    return;
+                  }
+
+                  const conn = activeConnectionId ? connections.find(c => c.id === activeConnectionId) : null;
+
+                  const filePath = await window.api.dialog.openFile();
+                  if (filePath) {
+                    alert('Lendo arquivo... Caso seja um arquivo gerado por este app, as configurações da conexão e o histórico de queries serão restaurados automaticamente.');
+                    const apiGroup = (conn && conn.driver === 'mysql') ? window.api.mysql : window.api.pg;
+                    const res = await apiGroup.importDatabase(conn || null, filePath);
+                    if (res.success) {
+                      alert('Importação concluída com sucesso!');
+                      loadConnections();
+                      if (conn) toggleConnection(conn, true);
+                    } else {
+                      alert('Erro ao importar: ' + res.error);
+                    }
+                  }
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-accent/20 hover:text-accent text-zinc-300 transition-colors"
+              >
+                Importar Banco / Projeto
+              </button>
+            </>
+          ) : contextMenu.type === 'table' ? (
             <>
               <div className="px-3 py-1.5 text-xs text-zinc-500 font-medium border-b border-border/50 mb-1 truncate">
                 {contextMenu.schema}.{contextMenu.table}
@@ -322,7 +387,8 @@ ORDER BY ordinal_position;
                     if (filePath) {
                       setContextMenu(null);
                       alert('Exportando banco de dados... Isso pode demorar um pouco (estruturas e até 5000 linhas por tabela).');
-                      const res = await window.api.pg.exportDatabase(conn, filePath);
+                      const apiGroup = conn.driver === 'mysql' ? window.api.mysql : window.api.pg;
+                      const res = await apiGroup.exportDatabase(conn, filePath);
                       if (res.success) alert('Banco exportado com sucesso para: ' + filePath);
                       else alert('Erro ao exportar banco: ' + res.error);
                     } else {
